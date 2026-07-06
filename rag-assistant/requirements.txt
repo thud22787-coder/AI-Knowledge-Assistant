@@ -6,3 +6,4 @@ pgvector
 python-multipart
 python-dotenv
 pydantic-settings
+pymupdf

@@ -3,6 +3,7 @@ from numbers import Real
 from uuid import uuid4
 
 import pytest
+import fitz
 from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
@@ -243,16 +244,127 @@ def test_process_txt_document_creates_embeddings(cleanup_uploaded_files):
         db.close()
 
 
+def test_process_pdf_document_creates_embeddings(cleanup_uploaded_files):
+    created_paths, created_ids = cleanup_uploaded_files
+    pdf_path = Path("storage") / "uploads" / "process.pdf"
+    document_pdf = fitz.open()
+    try:
+        page = document_pdf.new_page()
+        page.insert_text((72, 72), "This is a PDF document for processing.")
+        document_pdf.save(pdf_path)
+    finally:
+        document_pdf.close()
+
+    upload_response = client.post(
+        "/documents/upload",
+        files={"file": ("process.pdf", pdf_path.read_bytes(), "application/pdf")},
+    )
+
+    assert upload_response.status_code == 200
+    uploaded = upload_response.json()
+
+    db = SessionLocal()
+    try:
+        document = db.get(Document, uploaded["id"])
+        assert document is not None
+        created_ids.append(document.id)
+        created_paths.append(document.file_path)
+    finally:
+        db.close()
+
+    process_response = client.post(f"/documents/{uploaded['id']}/process")
+    assert process_response.status_code == 200
+    process_payload = process_response.json()
+    assert process_payload["document_id"] == uploaded["id"]
+    assert process_payload["chunk_count"] > 0
+
+    db = SessionLocal()
+    try:
+        chunks = db.query(Chunk).filter(Chunk.document_id == uploaded["id"]).order_by(Chunk.chunk_index.asc()).all()
+        assert len(chunks) > 0
+        assert any(chunk.embedding is not None for chunk in chunks)
+    finally:
+        db.close()
+
+
+def test_process_multipage_pdf_has_sequential_chunk_index(cleanup_uploaded_files):
+    created_paths, created_ids = cleanup_uploaded_files
+    pdf_path = Path("storage") / "uploads" / "multipage.pdf"
+    page_texts = [
+        (
+            "Page one paragraph one is intentionally long so it comfortably exceeds the chunking threshold. "
+            "It keeps repeating descriptive language to ensure the first page yields multiple chunks. "
+            "Another sentence adds more length and keeps the content stable for the test.\n\n"
+            "Page one paragraph two is also long enough to force another chunk. "
+            "The sentence structure is repetitive on purpose so the parser and chunker both have enough material. "
+            "This paragraph should contribute additional chunks on page one."
+        ),
+        (
+            "Page two paragraph one is similarly verbose and exists to create multiple chunks on the second page. "
+            "The wording is repetitive, extended, and deliberately longer than the chunk size threshold. "
+            "This makes it easy to detect whether chunk_index resets for a new page.\n\n"
+            "Page two paragraph two continues the pattern with another long block of text for chunking. "
+            "It provides enough length to guarantee more than one chunk on page two as well. "
+            "The goal is to confirm indexes remain sequential across the whole document."
+        ),
+    ]
+
+    document_pdf = fitz.open()
+    try:
+        for text in page_texts:
+            page = document_pdf.new_page()
+            y = 72
+            for paragraph in text.split("\n\n"):
+                page.insert_text((72, y), paragraph)
+                y += 120
+        document_pdf.save(pdf_path)
+    finally:
+        document_pdf.close()
+
+    upload_response = client.post(
+        "/documents/upload",
+        files={"file": ("multipage.pdf", pdf_path.read_bytes(), "application/pdf")},
+    )
+
+    assert upload_response.status_code == 200
+    uploaded = upload_response.json()
+
+    db = SessionLocal()
+    try:
+        document = db.get(Document, uploaded["id"])
+        assert document is not None
+        created_ids.append(document.id)
+        created_paths.append(document.file_path)
+    finally:
+        db.close()
+
+    process_response = client.post(f"/documents/{uploaded['id']}/process")
+    assert process_response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        chunks = db.query(Chunk).filter(Chunk.document_id == uploaded["id"]).order_by(Chunk.chunk_index.asc()).all()
+        assert [chunk.chunk_index for chunk in chunks] == list(range(len(chunks)))
+    finally:
+        db.close()
+
+
 def test_process_nonexistent_document_returns_404(cleanup_uploaded_files):
     response = client.post(f"/documents/{uuid4()}/process")
     assert response.status_code == 404
 
 
-def test_process_non_txt_document_returns_400(cleanup_uploaded_files):
+def test_process_docx_document_returns_400(cleanup_uploaded_files):
     created_paths, created_ids = cleanup_uploaded_files
     upload_response = client.post(
         "/documents/upload",
-        files={"file": ("fake.pdf", b"not a real pdf", "application/pdf")},
+        files={
+            "file": (
+                "fake.docx",
+                b"not a real docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
     )
 
     assert upload_response.status_code == 200

@@ -1,3 +1,5 @@
+import fitz
+
 def parse_txt(file_path: str) -> str:
     for encoding in ("utf-8", "utf-8-sig"):
         try:
@@ -7,3 +9,14 @@ def parse_txt(file_path: str) -> str:
             continue
 
     return ""
+
+
+def parse_pdf(file_path: str) -> list[dict]:
+    document = fitz.open(file_path)
+    try:
+        return [
+            {"page_number": index + 1, "text": page.get_text().strip()}
+            for index, page in enumerate(document)
+        ]
+    finally:
+        document.close()
