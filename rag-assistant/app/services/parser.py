@@ -1,3 +1,4 @@
+import docx
 import fitz
 
 def parse_txt(file_path: str) -> str:
@@ -9,6 +10,16 @@ def parse_txt(file_path: str) -> str:
             continue
 
     return ""
+
+
+def parse_docx(file_path: str) -> str:
+    document = docx.Document(file_path)
+    paragraphs = [
+        paragraph.text.strip()
+        for paragraph in document.paragraphs
+        if paragraph.text.strip() != ""
+    ]
+    return "\n\n".join(paragraphs)
 
 
 def parse_pdf(file_path: str) -> list[dict]:

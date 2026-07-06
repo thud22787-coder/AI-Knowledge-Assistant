@@ -1,8 +1,9 @@
 from pathlib import Path
 
+import docx
 import fitz
 
-from app.services.parser import parse_pdf
+from app.services import parser
 
 
 def test_parse_pdf_extracts_text_with_page_numbers(tmp_path):
@@ -21,8 +22,28 @@ def test_parse_pdf_extracts_text_with_page_numbers(tmp_path):
     finally:
         document.close()
 
-    result = parse_pdf(str(pdf_path))
+    result = parser.parse_pdf(str(pdf_path))
 
     assert len(result) == len(page_texts)
     assert [page["page_number"] for page in result] == [1, 2]
     assert [page["text"] for page in result] == page_texts
+
+
+def test_parse_docx_extracts_paragraph_text(tmp_path):
+    docx_path = tmp_path / "sample.docx"
+    paragraph_texts = [
+        "DOCX paragraph one: alpha beta gamma.",
+        "DOCX paragraph two: delta epsilon zeta.",
+        "DOCX paragraph three: eta theta iota.",
+    ]
+
+    document = docx.Document()
+    for text in paragraph_texts:
+        document.add_paragraph(text)
+    document.save(docx_path)
+
+    result = parser.parse_docx(str(docx_path))
+
+    assert isinstance(result, str)
+    for text in paragraph_texts:
+        assert text in result

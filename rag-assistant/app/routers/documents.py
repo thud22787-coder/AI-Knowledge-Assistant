@@ -8,7 +8,7 @@ from app.database import get_db
 from app.models import Chunk, Document
 from app.services.embedder import embed_texts
 from app.services.chunker import chunk_text
-from app.services.parser import parse_pdf, parse_txt
+from app.services.parser import parse_docx, parse_pdf, parse_txt
 
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -84,6 +84,12 @@ def process_document(document_id: uuid.UUID, db: Session = Depends(get_db)):
     suffix = Path(document.filename).suffix.lower()
     if suffix == ".txt":
         text = parse_txt(document.file_path)
+        chunks = [
+            {**chunk_data, "page_number": None}
+            for chunk_data in chunk_text(text)
+        ]
+    elif suffix == ".docx":
+        text = parse_docx(document.file_path)
         chunks = [
             {**chunk_data, "page_number": None}
             for chunk_data in chunk_text(text)

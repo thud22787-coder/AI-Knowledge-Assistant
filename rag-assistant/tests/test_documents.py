@@ -2,6 +2,7 @@ from pathlib import Path
 from numbers import Real
 from uuid import uuid4
 
+import docx
 import pytest
 import fitz
 from fastapi.testclient import TestClient
@@ -244,9 +245,9 @@ def test_process_txt_document_creates_embeddings(cleanup_uploaded_files):
         db.close()
 
 
-def test_process_pdf_document_creates_embeddings(cleanup_uploaded_files):
+def test_process_pdf_document_creates_embeddings(cleanup_uploaded_files, tmp_path):
     created_paths, created_ids = cleanup_uploaded_files
-    pdf_path = Path("storage") / "uploads" / "process.pdf"
+    pdf_path = tmp_path / "process.pdf"
     document_pdf = fitz.open()
     try:
         page = document_pdf.new_page()
@@ -287,9 +288,9 @@ def test_process_pdf_document_creates_embeddings(cleanup_uploaded_files):
         db.close()
 
 
-def test_process_multipage_pdf_has_sequential_chunk_index(cleanup_uploaded_files):
+def test_process_multipage_pdf_has_sequential_chunk_index(cleanup_uploaded_files, tmp_path):
     created_paths, created_ids = cleanup_uploaded_files
-    pdf_path = Path("storage") / "uploads" / "multipage.pdf"
+    pdf_path = tmp_path / "multipage.pdf"
     page_texts = [
         (
             "Page one paragraph one is intentionally long so it comfortably exceeds the chunking threshold. "
@@ -354,14 +355,45 @@ def test_process_nonexistent_document_returns_404(cleanup_uploaded_files):
     assert response.status_code == 404
 
 
-def test_process_docx_document_returns_400(cleanup_uploaded_files):
+def test_process_unsupported_extension_returns_400(cleanup_uploaded_files):
     created_paths, created_ids = cleanup_uploaded_files
+    db = SessionLocal()
+    try:
+        document = Document(
+            filename="fake.xlsx",
+            file_path="storage/uploads/fake.xlsx",
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            status="uploaded",
+        )
+        db.add(document)
+        db.commit()
+        db.refresh(document)
+        created_ids.append(document.id)
+    finally:
+        db.close()
+
+    process_response = client.post(f"/documents/{document.id}/process")
+    assert process_response.status_code == 400
+
+
+def test_process_docx_document_creates_embeddings(cleanup_uploaded_files, tmp_path):
+    created_paths, created_ids = cleanup_uploaded_files
+    docx_path = tmp_path / "process.docx"
+    document_docx = docx.Document()
+    document_docx.add_paragraph(
+        "This is the first DOCX paragraph for processing. It should be parsed into text and chunked."
+    )
+    document_docx.add_paragraph(
+        "This is the second DOCX paragraph for processing. It gives the test another paragraph to verify."
+    )
+    document_docx.save(docx_path)
+
     upload_response = client.post(
         "/documents/upload",
         files={
             "file": (
-                "fake.docx",
-                b"not a real docx",
+                "process.docx",
+                docx_path.read_bytes(),
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             )
         },
@@ -380,4 +412,14 @@ def test_process_docx_document_returns_400(cleanup_uploaded_files):
         db.close()
 
     process_response = client.post(f"/documents/{uploaded['id']}/process")
-    assert process_response.status_code == 400
+    assert process_response.status_code == 200
+    process_payload = process_response.json()
+    assert process_payload["chunk_count"] > 0
+
+    db = SessionLocal()
+    try:
+        chunks = db.query(Chunk).filter(Chunk.document_id == uploaded["id"]).order_by(Chunk.chunk_index.asc()).all()
+        assert len(chunks) > 0
+        assert any(chunk.embedding is not None for chunk in chunks)
+    finally:
+        db.close()
