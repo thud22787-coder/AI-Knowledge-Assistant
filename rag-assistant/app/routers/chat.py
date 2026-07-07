@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models import Chunk
 from app.services.embedder import embed_text
 from app.services.llm import generate_answer
+from app.services.reranker import rerank_chunks
 from app.services.retriever import search_similar_chunks
 
 
@@ -26,7 +27,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 @router.post("")
 def chat(request: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
     query_embedding = embed_text(request.question)
-    context_chunks = search_similar_chunks(query_embedding=query_embedding, db=db, top_k=5)
+    context_chunks = search_similar_chunks(query_embedding=query_embedding, db=db, top_k=20)
 
     if not context_chunks:
         return ChatResponse(
@@ -34,6 +35,7 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
             sources=[],
         )
 
+    context_chunks = rerank_chunks(query=request.question, chunks=context_chunks, top_k=5)
     answer = generate_answer(question=request.question, context_chunks=context_chunks)
     sources = [
         {

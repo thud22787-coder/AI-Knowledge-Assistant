@@ -66,7 +66,9 @@ def test_chat_with_matching_chunks_returns_answer_with_sources():
         for chunk in created_chunks:
             db.refresh(chunk)
 
-        with patch("app.routers.chat.generate_answer", return_value="câu trả lời giả lập") as mock_generate:
+        with patch("app.routers.chat.generate_answer", return_value="câu trả lời giả lập") as mock_generate, patch(
+            "app.routers.chat.rerank_chunks", side_effect=lambda query, chunks, top_k: chunks
+        ) as mock_rerank:
             response = client.post("/chat", json={"question": "Câu hỏi test"})
 
         assert response.status_code == 200
@@ -78,6 +80,7 @@ def test_chat_with_matching_chunks_returns_answer_with_sources():
             assert "page_number" in source
             assert "text" in source
         mock_generate.assert_called_once()
+        mock_rerank.assert_called_once()
     finally:
         for chunk in created_chunks:
             db.delete(chunk)
