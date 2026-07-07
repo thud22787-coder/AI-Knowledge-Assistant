@@ -1,10 +1,14 @@
-from openai import OpenAI
+from openai import APIError, APIStatusError, APITimeoutError, OpenAI, RateLimitError
 
 from app.config import settings
 from app.models import Chunk, Message
 
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+
+class LLMServiceError(Exception):
+    pass
 
 
 def generate_answer(question: str, context_chunks: list[Chunk], history: list[Message] | None = None) -> str:
@@ -39,6 +43,15 @@ def generate_answer(question: str, context_chunks: list[Chunk], history: list[Me
         }
     )
 
-    response = client.chat.completions.create(model=settings.OPENAI_MODEL, messages=messages)
+    try:
+        response = client.chat.completions.create(model=settings.OPENAI_MODEL, messages=messages)
+    except APITimeoutError as exc:
+        raise LLMServiceError("LLM request timed out.") from exc
+    except RateLimitError as exc:
+        raise LLMServiceError("LLM rate limit exceeded.") from exc
+    except APIStatusError as exc:
+        raise LLMServiceError("LLM request failed with an API status error.") from exc
+    except APIError as exc:
+        raise LLMServiceError("LLM request failed due to an API error.") from exc
 
     return response.choices[0].message.content

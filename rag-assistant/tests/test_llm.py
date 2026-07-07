@@ -1,8 +1,12 @@
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import httpx
+import pytest
+from openai import APITimeoutError
+
 from app.models import Chunk
-from app.services.llm import generate_answer
+from app.services.llm import LLMServiceError, generate_answer
 
 
 def test_generate_answer_builds_context_and_returns_content():
@@ -37,3 +41,12 @@ def test_generate_answer_builds_context_and_returns_content():
     assert "Đây là chunk không có số trang" in messages[1]["content"]
     assert "Chunk phụ trợ" in messages[1]["content"]
     assert "[Nguồn: trang" in messages[1]["content"]
+
+
+def test_generate_answer_raises_llm_service_error_on_timeout():
+    chunks = [Chunk(text="Chunk test", page_number=None)]
+    timeout_error = APITimeoutError(request=httpx.Request("POST", "https://api.openai.com/v1/chat/completions"))
+
+    with patch("app.services.llm.client.chat.completions.create", side_effect=timeout_error):
+        with pytest.raises(LLMServiceError):
+            generate_answer(question="Câu hỏi test", context_chunks=chunks)

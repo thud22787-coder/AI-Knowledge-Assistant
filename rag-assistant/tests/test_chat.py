@@ -4,6 +4,7 @@ from app.database import SessionLocal
 from app.main import app
 from app.models import Chunk, Conversation, Document, Message
 from app.models import User
+from app.services.llm import LLMServiceError
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 
@@ -83,6 +84,55 @@ def test_chat_with_matching_chunks_returns_answer_with_sources(auth_headers, aut
             assert "document_id" in source
             assert "page_number" in source
             assert "text" in source
+        mock_generate.assert_called_once()
+        mock_rerank.assert_called_once()
+    finally:
+        for chunk in created_chunks:
+            db.delete(chunk)
+        if document is not None:
+            db.delete(document)
+        db.commit()
+        db.close()
+
+
+def test_chat_returns_503_when_llm_service_fails(auth_headers, auth_user_id):
+    db = SessionLocal()
+    document = None
+    created_chunks: list[Chunk] = []
+
+    try:
+        document = Document(
+            filename="chat-error-test.txt",
+            file_path="storage/uploads/chat-error-test.txt",
+            content_type="text/plain",
+            status="ready",
+            user_id=auth_user_id,
+        )
+        db.add(document)
+        db.commit()
+        db.refresh(document)
+
+        chunk = Chunk(
+            document_id=document.id,
+            chunk_index=0,
+            page_number=1,
+            text="Ná»™i dung chunk test lá»—i",
+            embedding=_make_embedding(1.0),
+        )
+
+        created_chunks.append(chunk)
+        db.add(chunk)
+        db.commit()
+        db.refresh(chunk)
+
+        with patch(
+            "app.routers.chat.generate_answer", side_effect=LLMServiceError("mock llm failure")
+        ) as mock_generate, patch(
+            "app.routers.chat.rerank_chunks", return_value=[chunk]
+        ) as mock_rerank:
+            response = client.post("/chat", json={"question": "CÃ¢u há»i test"}, headers=auth_headers)
+
+        assert response.status_code == 503
         mock_generate.assert_called_once()
         mock_rerank.assert_called_once()
     finally:

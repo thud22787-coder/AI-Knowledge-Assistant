@@ -9,7 +9,7 @@ from app.database import get_db
 from app.models import Chunk, Conversation, Message, User
 from app.services.auth import get_current_user
 from app.services.embedder import embed_text
-from app.services.llm import generate_answer
+from app.services.llm import LLMServiceError, generate_answer
 from app.services.reranker import rerank_chunks
 from app.services.retriever import search_similar_chunks
 
@@ -84,7 +84,10 @@ def chat(request: ChatRequest, db: Session = Depends(get_db), current_user: User
         return ChatResponse(answer=answer, conversation_id=conversation_id, sources=[])
 
     context_chunks = rerank_chunks(query=request.question, chunks=context_chunks, top_k=5)
-    answer = generate_answer(question=request.question, context_chunks=context_chunks, history=history)
+    try:
+        answer = generate_answer(question=request.question, context_chunks=context_chunks, history=history)
+    except LLMServiceError:
+        raise HTTPException(status_code=503, detail="Không thể tạo câu trả lời lúc này, vui lòng thử lại sau.")
     sources = [
         {
             "document_id": str(chunk.document_id),
