@@ -18,11 +18,11 @@ def _make_embedding(base_value: float, offset_index: int | None = None, offset_v
     return embedding
 
 
-def test_chat_with_no_matching_chunks_returns_fallback_answer():
+def test_chat_with_no_matching_chunks_returns_fallback_answer(auth_headers):
     with patch("app.routers.chat.search_similar_chunks", return_value=[]) as mock_search, patch(
         "app.routers.chat.generate_answer"
     ) as mock_generate:
-        response = client.post("/chat", json={"question": "Câu hỏi không có kết quả"})
+        response = client.post("/chat", json={"question": "Câu hỏi không có kết quả"}, headers=auth_headers)
 
     assert response.status_code == 200
     payload = response.json()
@@ -32,27 +32,18 @@ def test_chat_with_no_matching_chunks_returns_fallback_answer():
     mock_search.assert_called_once()
 
 
-def test_chat_with_matching_chunks_returns_answer_with_sources():
+def test_chat_with_matching_chunks_returns_answer_with_sources(auth_headers, auth_user_id):
     db = SessionLocal()
     document = None
-    user = None
     created_chunks: list[Chunk] = []
 
     try:
-        user = User(
-            email=f"test-{uuid.uuid4()}@example.com",
-            hashed_password="test_hash",
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
         document = Document(
             filename="chat-test.txt",
             file_path="storage/uploads/chat-test.txt",
             content_type="text/plain",
             status="ready",
-            user_id=user.id,
+            user_id=auth_user_id,
         )
         db.add(document)
         db.commit()
@@ -82,7 +73,7 @@ def test_chat_with_matching_chunks_returns_answer_with_sources():
         with patch("app.routers.chat.generate_answer", return_value="câu trả lời giả lập") as mock_generate, patch(
             "app.routers.chat.rerank_chunks", side_effect=lambda query, chunks, top_k: chunks
         ) as mock_rerank:
-            response = client.post("/chat", json={"question": "Câu hỏi test"})
+            response = client.post("/chat", json={"question": "Câu hỏi test"}, headers=auth_headers)
 
         assert response.status_code == 200
         payload = response.json()
@@ -99,13 +90,11 @@ def test_chat_with_matching_chunks_returns_answer_with_sources():
             db.delete(chunk)
         if document is not None:
             db.delete(document)
-        if user is not None:
-            db.delete(user)
         db.commit()
         db.close()
 
 
-def test_chat_persists_messages_for_conversation_sequence():
+def test_chat_persists_messages_for_conversation_sequence(auth_headers):
     db = SessionLocal()
     conversation = None
 
@@ -122,10 +111,12 @@ def test_chat_persists_messages_for_conversation_sequence():
             first_response = client.post(
                 "/chat",
                 json={"question": "câu hỏi đầu tiên", "conversation_id": str(conversation_id)},
+                headers=auth_headers,
             )
             second_response = client.post(
                 "/chat",
                 json={"question": "câu hỏi thứ hai", "conversation_id": str(conversation_id)},
+                headers=auth_headers,
             )
 
         assert first_response.status_code == 200
@@ -156,7 +147,7 @@ def test_chat_persists_messages_for_conversation_sequence():
         db.close()
 
 
-def test_chat_passes_recent_history_to_generate_answer():
+def test_chat_passes_recent_history_to_generate_answer(auth_headers):
     db = SessionLocal()
     conversation = None
     user = None
@@ -236,6 +227,7 @@ def test_chat_passes_recent_history_to_generate_answer():
             response = client.post(
                 "/chat",
                 json={"question": "câu hỏi mới", "conversation_id": str(conversation.id)},
+                headers=auth_headers,
             )
 
         assert response.status_code == 200

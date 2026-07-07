@@ -76,7 +76,7 @@ def test_search_similar_chunks_returns_closest_matches():
         for chunk in created_chunks:
             db.refresh(chunk)
 
-        results = search_similar_chunks(query_embedding=query_embedding, db=db, top_k=2)
+        results = search_similar_chunks(query_embedding=query_embedding, user_id=user.id, db=db, top_k=2)
 
         assert len(results) == 2
         assert results[0].id == nearest_chunk.id
@@ -88,5 +88,89 @@ def test_search_similar_chunks_returns_closest_matches():
             db.delete(document)
         if user is not None:
             db.delete(user)
+        db.commit()
+        db.close()
+
+
+def test_search_similar_chunks_filters_by_user_id():
+    db = SessionLocal()
+    user_a = None
+    user_b = None
+    document_a = None
+    document_b = None
+    created_chunks: list[Chunk] = []
+
+    try:
+        user_a = User(
+            email=f"user-a-{uuid.uuid4()}@example.com",
+            hashed_password="test_hash",
+        )
+        user_b = User(
+            email=f"user-b-{uuid.uuid4()}@example.com",
+            hashed_password="test_hash",
+        )
+        db.add_all([user_a, user_b])
+        db.commit()
+        db.refresh(user_a)
+        db.refresh(user_b)
+
+        document_a = Document(
+            filename="user-a-doc.txt",
+            file_path="storage/uploads/user-a-doc.txt",
+            content_type="text/plain",
+            status="ready",
+            user_id=user_a.id,
+        )
+        document_b = Document(
+            filename="user-b-doc.txt",
+            file_path="storage/uploads/user-b-doc.txt",
+            content_type="text/plain",
+            status="ready",
+            user_id=user_b.id,
+        )
+        db.add_all([document_a, document_b])
+        db.commit()
+        db.refresh(document_a)
+        db.refresh(document_b)
+
+        query_embedding = _make_embedding(1.0)
+        chunk_a = Chunk(
+            document_id=document_a.id,
+            chunk_index=0,
+            page_number=1,
+            text="Shared semantic match for user A",
+            embedding=_make_embedding(1.0),
+        )
+        chunk_b = Chunk(
+            document_id=document_b.id,
+            chunk_index=0,
+            page_number=1,
+            text="Shared semantic match for user B",
+            embedding=_make_embedding(1.0),
+        )
+
+        created_chunks.extend([chunk_a, chunk_b])
+        db.add_all(created_chunks)
+        db.commit()
+        for chunk in created_chunks:
+            db.refresh(chunk)
+
+        results = search_similar_chunks(query_embedding=query_embedding, db=db, user_id=user_a.id, top_k=10)
+
+        result_ids = {chunk.id for chunk in results}
+        assert chunk_a.id in result_ids
+        assert chunk_b.id not in result_ids
+        assert all(chunk.document_id == document_a.id for chunk in results)
+    finally:
+        for chunk in created_chunks:
+            db.delete(chunk)
+        if document_a is not None:
+            db.delete(document_a)
+        if document_b is not None:
+            db.delete(document_b)
+        if user_a is not None:
+            db.delete(user_a)
+        if user_b is not None:
+            db.delete(user_b)
         db.commit()
         db.close()

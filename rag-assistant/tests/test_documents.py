@@ -18,18 +18,6 @@ UPLOAD_DIR = Path("storage/uploads")
 
 
 @pytest.fixture
-def auth_headers():
-    email = f"test-{uuid4()}@example.com"
-    password = "test_password_123"
-    register_response = client.post("/auth/register", json={"email": email, "password": password})
-    assert register_response.status_code == 200
-    login_response = client.post("/auth/login", json={"email": email, "password": password})
-    assert login_response.status_code == 200
-    token = login_response.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
-
-
-@pytest.fixture
 def cleanup_uploaded_files():
     created_paths = []
     created_ids = []

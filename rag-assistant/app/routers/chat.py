@@ -6,7 +6,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Chunk, Conversation, Message
+from app.models import Chunk, Conversation, Message, User
+from app.services.auth import get_current_user
 from app.services.embedder import embed_text
 from app.services.llm import generate_answer
 from app.services.reranker import rerank_chunks
@@ -28,7 +29,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 
 @router.post("")
-def chat(request: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
+def chat(request: ChatRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ChatResponse:
     if request.conversation_id is None:
         conversation = Conversation()
         db.add(conversation)
@@ -65,7 +66,7 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
     history.reverse()
 
     query_embedding = embed_text(request.question)
-    context_chunks = search_similar_chunks(query_embedding=query_embedding, db=db, top_k=20)
+    context_chunks = search_similar_chunks(query_embedding=query_embedding, user_id=current_user.id, db=db, top_k=20)
 
     if not context_chunks:
         answer = "Không tìm thấy thông tin liên quan trong tài liệu đã upload."
