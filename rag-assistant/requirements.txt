@@ -12,3 +12,6 @@ sentence-transformers
 streamlit
 requests
 alembic
+python-jose[cryptography]
+passlib[bcrypt]
+email-validator
