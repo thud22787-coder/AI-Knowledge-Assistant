@@ -9,3 +9,5 @@ pydantic-settings
 pymupdf
 python-docx
 sentence-transformers
+streamlit
+requests
