@@ -3,9 +3,72 @@ import streamlit as st
 
 
 API_BASE_URL = "http://localhost:8000"
+LOGIN_ENDPOINT = f"{API_BASE_URL}/auth/login"
+REGISTER_ENDPOINT = f"{API_BASE_URL}/auth/register"
 
 
 st.set_page_config(page_title="AI Knowledge Assistant", layout="wide")
+
+if "access_token" not in st.session_state:
+    st.session_state.access_token = None
+
+if st.session_state.access_token is None:
+    login_tab, register_tab = st.tabs(["Login", "Register"])
+
+    with login_tab:
+        with st.form("login_form"):
+            login_email = st.text_input("Email", key="login_email")
+            login_password = st.text_input("Password", type="password", key="login_password")
+            login_submitted = st.form_submit_button("Login")
+
+        if login_submitted:
+            try:
+                login_response = requests.post(
+                    LOGIN_ENDPOINT,
+                    data={"username": login_email, "password": login_password},
+                    timeout=60,
+                )
+                if login_response.status_code == 401:
+                    st.error("Invalid email or password.")
+                else:
+                    login_response.raise_for_status()
+                    st.session_state.access_token = login_response.json()["access_token"]
+                    st.rerun()
+            except requests.RequestException as exc:
+                st.error(f"Login request failed: {exc}")
+            except (KeyError, ValueError) as exc:
+                st.error(f"Unexpected login response: {exc}")
+
+    with register_tab:
+        with st.form("register_form"):
+            register_email = st.text_input("Email", key="register_email")
+            register_password = st.text_input("Password", type="password", key="register_password")
+            register_submitted = st.form_submit_button("Register")
+
+        if register_submitted:
+            try:
+                register_response = requests.post(
+                    REGISTER_ENDPOINT,
+                    json={"email": register_email, "password": register_password},
+                    timeout=60,
+                )
+                if register_response.status_code == 400:
+                    st.error("Email already exists.")
+                else:
+                    register_response.raise_for_status()
+                    st.success("Registration successful. Please switch to the Login tab.")
+            except requests.RequestException as exc:
+                st.error(f"Registration request failed: {exc}")
+            except ValueError as exc:
+                st.error(f"Unexpected registration response: {exc}")
+
+    st.stop()
+
+if st.sidebar.button("Logout"):
+    st.session_state.access_token = None
+    st.rerun()
+
+auth_headers = {"Authorization": f"Bearer {st.session_state.access_token}"}
 
 
 def upload_and_process(file_obj):
@@ -13,12 +76,16 @@ def upload_and_process(file_obj):
         "file": (file_obj.name, file_obj, getattr(file_obj, "type", None) or "application/octet-stream")
     }
 
-    upload_response = requests.post(f"{API_BASE_URL}/documents/upload", files=files, timeout=60)
+    upload_response = requests.post(
+        f"{API_BASE_URL}/documents/upload", files=files, headers=auth_headers, timeout=60
+    )
     upload_response.raise_for_status()
     upload_data = upload_response.json()
 
     document_id = upload_data["id"]
-    process_response = requests.post(f"{API_BASE_URL}/documents/{document_id}/process", timeout=60)
+    process_response = requests.post(
+        f"{API_BASE_URL}/documents/{document_id}/process", headers=auth_headers, timeout=60
+    )
     process_response.raise_for_status()
     process_data = process_response.json()
 
@@ -26,7 +93,9 @@ def upload_and_process(file_obj):
 
 
 def delete_document(document_id):
-    delete_response = requests.delete(f"{API_BASE_URL}/documents/{document_id}", timeout=60)
+    delete_response = requests.delete(
+        f"{API_BASE_URL}/documents/{document_id}", headers=auth_headers, timeout=60
+    )
     delete_response.raise_for_status()
 
 
@@ -51,7 +120,7 @@ if st.sidebar.button("Upload", width="stretch"):
 st.title("Documents")
 
 try:
-    documents_response = requests.get(f"{API_BASE_URL}/documents", timeout=60)
+    documents_response = requests.get(f"{API_BASE_URL}/documents", headers=auth_headers, timeout=60)
     documents_response.raise_for_status()
     documents = documents_response.json()
 except requests.RequestException as exc:
@@ -128,6 +197,7 @@ if question:
                 "question": question,
                 "conversation_id": st.session_state.conversation_id,
             },
+            headers=auth_headers,
             timeout=60,
         )
         response.raise_for_status()
