@@ -11,3 +11,4 @@ python-docx
 sentence-transformers
 streamlit
 requests
+alembic
