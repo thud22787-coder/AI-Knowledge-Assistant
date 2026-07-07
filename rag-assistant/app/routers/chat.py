@@ -31,7 +31,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 @router.post("")
 def chat(request: ChatRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ChatResponse:
     if request.conversation_id is None:
-        conversation = Conversation()
+        conversation = Conversation(user_id=current_user.id)
         db.add(conversation)
         db.commit()
         db.refresh(conversation)
@@ -39,6 +39,8 @@ def chat(request: ChatRequest, db: Session = Depends(get_db), current_user: User
     else:
         conversation = db.get(Conversation, request.conversation_id)
         if conversation is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        if conversation.user_id != current_user.id:
             raise HTTPException(status_code=404, detail="Conversation not found")
         conversation_id = conversation.id
 

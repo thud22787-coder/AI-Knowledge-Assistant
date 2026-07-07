@@ -94,12 +94,12 @@ def test_chat_with_matching_chunks_returns_answer_with_sources(auth_headers, aut
         db.close()
 
 
-def test_chat_persists_messages_for_conversation_sequence(auth_headers):
+def test_chat_persists_messages_for_conversation_sequence(auth_headers, auth_user_id):
     db = SessionLocal()
     conversation = None
 
     try:
-        conversation = Conversation()
+        conversation = Conversation(user_id=auth_user_id)
         db.add(conversation)
         db.commit()
         db.refresh(conversation)
@@ -147,25 +147,16 @@ def test_chat_persists_messages_for_conversation_sequence(auth_headers):
         db.close()
 
 
-def test_chat_passes_recent_history_to_generate_answer(auth_headers):
+def test_chat_passes_recent_history_to_generate_answer(auth_headers, auth_user_id):
     db = SessionLocal()
     conversation = None
-    user = None
     document = None
     created_chunks: list[Chunk] = []
     try:
-        conversation = Conversation()
+        conversation = Conversation(user_id=auth_user_id)
         db.add(conversation)
         db.commit()
         db.refresh(conversation)
-
-        user = User(
-            email=f"test-{uuid.uuid4()}@example.com",
-            hashed_password="test_hash",
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
 
         prior_user = Message(
             conversation_id=conversation.id,
@@ -189,7 +180,7 @@ def test_chat_passes_recent_history_to_generate_answer(auth_headers):
             file_path="storage/uploads/history-test.txt",
             content_type="text/plain",
             status="ready",
-            user_id=user.id,
+            user_id=auth_user_id,
         )
         db.add(document)
         db.commit()
@@ -245,7 +236,33 @@ def test_chat_passes_recent_history_to_generate_answer(auth_headers):
             db.delete(conversation)
         if document is not None:
             db.delete(document)
-        if user is not None:
-            db.delete(user)
         db.commit()
         db.close()
+
+
+def test_user_cannot_access_another_users_conversation(auth_headers):
+    email_b = f"test-{uuid.uuid4()}@example.com"
+    password = "test_password_123"
+
+    client.post("/auth/register", json={"email": email_b, "password": password})
+    token_b = client.post("/auth/login", json={"email": email_b, "password": password}).json()["access_token"]
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+
+    with patch("app.routers.chat.search_similar_chunks", return_value=[]), patch(
+        "app.routers.chat.generate_answer"
+    ):
+        create_response = client.post("/chat", json={"question": "câu hỏi của user A"}, headers=auth_headers)
+
+    assert create_response.status_code == 200
+    conversation_id = create_response.json()["conversation_id"]
+
+    with patch("app.routers.chat.search_similar_chunks", return_value=[]), patch(
+        "app.routers.chat.generate_answer"
+    ):
+        response = client.post(
+            "/chat",
+            json={"question": "câu hỏi của user B", "conversation_id": conversation_id},
+            headers=headers_b,
+        )
+
+    assert response.status_code == 404

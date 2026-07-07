@@ -9,13 +9,13 @@ from fastapi.testclient import TestClient
 client = TestClient(app)
 
 
-def test_feedback_success_persists_on_assistant_message():
+def test_feedback_success_persists_on_assistant_message(auth_user_id):
     db = SessionLocal()
     conversation = None
     message = None
 
     try:
-        conversation = Conversation()
+        conversation = Conversation(user_id=auth_user_id)
         db.add(conversation)
         db.commit()
         db.refresh(conversation)
@@ -52,13 +52,13 @@ def test_feedback_returns_404_for_missing_message():
     assert response.status_code == 404
 
 
-def test_feedback_returns_400_for_user_message():
+def test_feedback_returns_400_for_user_message(auth_user_id):
     db = SessionLocal()
     conversation = None
     message = None
 
     try:
-        conversation = Conversation()
+        conversation = Conversation(user_id=auth_user_id)
         db.add(conversation)
         db.commit()
         db.refresh(conversation)
