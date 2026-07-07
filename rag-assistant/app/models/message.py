@@ -16,6 +16,7 @@ class Message(Base):
     role: Mapped[str] = mapped_column(String, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     sequence_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    feedback: Mapped[str | None] = mapped_column(String, nullable=True)
     extra_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
