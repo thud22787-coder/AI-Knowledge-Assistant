@@ -47,3 +47,13 @@ def test_parse_docx_extracts_paragraph_text(tmp_path):
     assert isinstance(result, str)
     for text in paragraph_texts:
         assert text in result
+
+
+def test_parse_txt_strips_bom(tmp_path):
+    txt_path = tmp_path / "sample.txt"
+    txt_path.write_text("Xin chào", encoding="utf-8-sig")
+
+    result = parser.parse_txt(str(txt_path))
+
+    assert "\ufeff" not in result
+    assert result == "Xin chào"

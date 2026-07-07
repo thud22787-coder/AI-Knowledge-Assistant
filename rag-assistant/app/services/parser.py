@@ -2,7 +2,7 @@ import docx
 import fitz
 
 def parse_txt(file_path: str) -> str:
-    for encoding in ("utf-8", "utf-8-sig"):
+    for encoding in ("utf-8-sig", "utf-8"):
         try:
             with open(file_path, "r", encoding=encoding) as file:
                 return file.read()

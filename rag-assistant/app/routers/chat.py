@@ -1,4 +1,4 @@
-from uuid import UUID
+﻿from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -102,3 +102,4 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
     db.commit()
 
     return ChatResponse(answer=answer, conversation_id=conversation_id, sources=sources)
+
