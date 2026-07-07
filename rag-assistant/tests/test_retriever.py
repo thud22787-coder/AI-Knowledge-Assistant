@@ -1,9 +1,9 @@
-from uuid import uuid4
+import uuid
 
 import pytest
 
 from app.database import SessionLocal
-from app.models import Chunk, Document
+from app.models import Chunk, Document, User
 from app.services.retriever import search_similar_chunks
 
 
@@ -17,14 +17,24 @@ def _make_embedding(base_value: float, offset_index: int | None = None, offset_v
 def test_search_similar_chunks_returns_closest_matches():
     db = SessionLocal()
     document = None
+    user = None
     created_chunks: list[Chunk] = []
 
     try:
+        user = User(
+            email=f"test-{uuid.uuid4()}@example.com",
+            hashed_password="test_hash",
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
         document = Document(
             filename="retrieval-test.txt",
             file_path="storage/uploads/retrieval-test.txt",
             content_type="text/plain",
             status="ready",
+            user_id=user.id,
         )
         db.add(document)
         db.commit()
@@ -76,5 +86,7 @@ def test_search_similar_chunks_returns_closest_matches():
             db.delete(chunk)
         if document is not None:
             db.delete(document)
+        if user is not None:
+            db.delete(user)
         db.commit()
         db.close()

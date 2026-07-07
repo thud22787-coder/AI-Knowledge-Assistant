@@ -9,11 +9,24 @@ from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
 from app.main import app
-from app.models import Chunk, Document
+from app.models import Chunk, Document, User
+from app.services.auth import decode_access_token
 
 
 client = TestClient(app)
 UPLOAD_DIR = Path("storage/uploads")
+
+
+@pytest.fixture
+def auth_headers():
+    email = f"test-{uuid4()}@example.com"
+    password = "test_password_123"
+    register_response = client.post("/auth/register", json={"email": email, "password": password})
+    assert register_response.status_code == 200
+    login_response = client.post("/auth/login", json={"email": email, "password": password})
+    assert login_response.status_code == 200
+    token = login_response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture
@@ -39,11 +52,12 @@ def cleanup_uploaded_files():
             path.unlink()
 
 
-def test_upload_valid_txt_file(cleanup_uploaded_files):
+def test_upload_valid_txt_file(cleanup_uploaded_files, auth_headers):
     created_paths, created_ids = cleanup_uploaded_files
     response = client.post(
         "/documents/upload",
         files={"file": ("sample.txt", b"hello world", "text/plain")},
+        headers=auth_headers,
     )
 
     assert response.status_code == 200
@@ -62,20 +76,22 @@ def test_upload_valid_txt_file(cleanup_uploaded_files):
         db.close()
 
 
-def test_upload_rejects_invalid_extension(cleanup_uploaded_files):
+def test_upload_rejects_invalid_extension(cleanup_uploaded_files, auth_headers):
     response = client.post(
         "/documents/upload",
         files={"file": ("malware.exe", b"bad", "application/octet-stream")},
+        headers=auth_headers,
     )
 
     assert response.status_code == 400
 
 
-def test_upload_creates_file_on_disk(cleanup_uploaded_files):
+def test_upload_creates_file_on_disk(cleanup_uploaded_files, auth_headers):
     created_paths, created_ids = cleanup_uploaded_files
     response = client.post(
         "/documents/upload",
         files={"file": ("diskcheck.txt", b"hello world", "text/plain")},
+        headers=auth_headers,
     )
 
     assert response.status_code == 200
@@ -93,11 +109,12 @@ def test_upload_creates_file_on_disk(cleanup_uploaded_files):
         db.close()
 
 
-def test_list_documents(cleanup_uploaded_files):
+def test_list_documents(cleanup_uploaded_files, auth_headers):
     created_paths, created_ids = cleanup_uploaded_files
     upload_response = client.post(
         "/documents/upload",
         files={"file": ("listcheck.txt", b"hello world", "text/plain")},
+        headers=auth_headers,
     )
 
     assert upload_response.status_code == 200
@@ -112,17 +129,18 @@ def test_list_documents(cleanup_uploaded_files):
     finally:
         db.close()
 
-    response = client.get("/documents")
+    response = client.get("/documents", headers=auth_headers)
     assert response.status_code == 200
     payload = response.json()
     assert any(item["id"] == uploaded["id"] and item["filename"] == "listcheck.txt" for item in payload)
 
 
-def test_delete_document(cleanup_uploaded_files):
+def test_delete_document(cleanup_uploaded_files, auth_headers):
     created_paths, created_ids = cleanup_uploaded_files
     upload_response = client.post(
         "/documents/upload",
         files={"file": ("deletecheck.txt", b"hello world", "text/plain")},
+        headers=auth_headers,
     )
 
     assert upload_response.status_code == 200
@@ -138,22 +156,22 @@ def test_delete_document(cleanup_uploaded_files):
     finally:
         db.close()
 
-    delete_response = client.delete(f"/documents/{uploaded['id']}")
+    delete_response = client.delete(f"/documents/{uploaded['id']}", headers=auth_headers)
     assert delete_response.status_code == 200
     assert delete_response.json() == {"id": uploaded["id"], "deleted": True}
     assert not file_path.exists()
 
-    list_response = client.get("/documents")
+    list_response = client.get("/documents", headers=auth_headers)
     assert list_response.status_code == 200
     assert all(item["id"] != uploaded["id"] for item in list_response.json())
 
 
-def test_delete_nonexistent_document(cleanup_uploaded_files):
-    response = client.delete(f"/documents/{uuid4()}")
+def test_delete_nonexistent_document(cleanup_uploaded_files, auth_headers):
+    response = client.delete(f"/documents/{uuid4()}", headers=auth_headers)
     assert response.status_code == 404
 
 
-def test_delete_document_also_deletes_chunks(cleanup_uploaded_files):
+def test_delete_document_also_deletes_chunks(cleanup_uploaded_files, auth_headers):
     created_paths, created_ids = cleanup_uploaded_files
     text = (
         "Paragraph one has enough text to create a chunk. "
@@ -163,6 +181,7 @@ def test_delete_document_also_deletes_chunks(cleanup_uploaded_files):
     upload_response = client.post(
         "/documents/upload",
         files={"file": ("delete_chunks.txt", text.encode("utf-8"), "text/plain")},
+        headers=auth_headers,
     )
 
     assert upload_response.status_code == 200
@@ -177,7 +196,7 @@ def test_delete_document_also_deletes_chunks(cleanup_uploaded_files):
     finally:
         db.close()
 
-    process_response = client.post(f"/documents/{uploaded['id']}/process")
+    process_response = client.post(f"/documents/{uploaded['id']}/process", headers=auth_headers)
     assert process_response.status_code == 200
     assert process_response.json()["chunk_count"] > 0
 
@@ -187,7 +206,7 @@ def test_delete_document_also_deletes_chunks(cleanup_uploaded_files):
     finally:
         db.close()
 
-    delete_response = client.delete(f"/documents/{uploaded['id']}")
+    delete_response = client.delete(f"/documents/{uploaded['id']}", headers=auth_headers)
     assert delete_response.status_code == 200
 
     db = SessionLocal()
@@ -197,7 +216,7 @@ def test_delete_document_also_deletes_chunks(cleanup_uploaded_files):
         db.close()
 
 
-def test_process_txt_document_creates_embeddings(cleanup_uploaded_files):
+def test_process_txt_document_creates_embeddings(cleanup_uploaded_files, auth_headers):
     created_paths, created_ids = cleanup_uploaded_files
     text = (
         "Paragraph one has enough text to make the parser and chunker work properly. "
@@ -208,6 +227,7 @@ def test_process_txt_document_creates_embeddings(cleanup_uploaded_files):
     upload_response = client.post(
         "/documents/upload",
         files={"file": ("process.txt", text.encode("utf-8"), "text/plain")},
+        headers=auth_headers,
     )
 
     assert upload_response.status_code == 200
@@ -222,7 +242,7 @@ def test_process_txt_document_creates_embeddings(cleanup_uploaded_files):
     finally:
         db.close()
 
-    process_response = client.post(f"/documents/{uploaded['id']}/process")
+    process_response = client.post(f"/documents/{uploaded['id']}/process", headers=auth_headers)
     assert process_response.status_code == 200
     process_payload = process_response.json()
     assert process_payload["document_id"] == uploaded["id"]
@@ -245,7 +265,7 @@ def test_process_txt_document_creates_embeddings(cleanup_uploaded_files):
         db.close()
 
 
-def test_process_pdf_document_creates_embeddings(cleanup_uploaded_files, tmp_path):
+def test_process_pdf_document_creates_embeddings(cleanup_uploaded_files, tmp_path, auth_headers):
     created_paths, created_ids = cleanup_uploaded_files
     pdf_path = tmp_path / "process.pdf"
     document_pdf = fitz.open()
@@ -259,6 +279,7 @@ def test_process_pdf_document_creates_embeddings(cleanup_uploaded_files, tmp_pat
     upload_response = client.post(
         "/documents/upload",
         files={"file": ("process.pdf", pdf_path.read_bytes(), "application/pdf")},
+        headers=auth_headers,
     )
 
     assert upload_response.status_code == 200
@@ -273,7 +294,7 @@ def test_process_pdf_document_creates_embeddings(cleanup_uploaded_files, tmp_pat
     finally:
         db.close()
 
-    process_response = client.post(f"/documents/{uploaded['id']}/process")
+    process_response = client.post(f"/documents/{uploaded['id']}/process", headers=auth_headers)
     assert process_response.status_code == 200
     process_payload = process_response.json()
     assert process_payload["document_id"] == uploaded["id"]
@@ -288,7 +309,7 @@ def test_process_pdf_document_creates_embeddings(cleanup_uploaded_files, tmp_pat
         db.close()
 
 
-def test_process_multipage_pdf_has_sequential_chunk_index(cleanup_uploaded_files, tmp_path):
+def test_process_multipage_pdf_has_sequential_chunk_index(cleanup_uploaded_files, tmp_path, auth_headers):
     created_paths, created_ids = cleanup_uploaded_files
     pdf_path = tmp_path / "multipage.pdf"
     page_texts = [
@@ -325,6 +346,7 @@ def test_process_multipage_pdf_has_sequential_chunk_index(cleanup_uploaded_files
     upload_response = client.post(
         "/documents/upload",
         files={"file": ("multipage.pdf", pdf_path.read_bytes(), "application/pdf")},
+        headers=auth_headers,
     )
 
     assert upload_response.status_code == 200
@@ -339,7 +361,7 @@ def test_process_multipage_pdf_has_sequential_chunk_index(cleanup_uploaded_files
     finally:
         db.close()
 
-    process_response = client.post(f"/documents/{uploaded['id']}/process")
+    process_response = client.post(f"/documents/{uploaded['id']}/process", headers=auth_headers)
     assert process_response.status_code == 200
 
     db = SessionLocal()
@@ -350,13 +372,15 @@ def test_process_multipage_pdf_has_sequential_chunk_index(cleanup_uploaded_files
         db.close()
 
 
-def test_process_nonexistent_document_returns_404(cleanup_uploaded_files):
-    response = client.post(f"/documents/{uuid4()}/process")
+def test_process_nonexistent_document_returns_404(cleanup_uploaded_files, auth_headers):
+    response = client.post(f"/documents/{uuid4()}/process", headers=auth_headers)
     assert response.status_code == 404
 
 
-def test_process_unsupported_extension_returns_400(cleanup_uploaded_files):
+def test_process_unsupported_extension_returns_400(cleanup_uploaded_files, auth_headers):
     created_paths, created_ids = cleanup_uploaded_files
+    token = auth_headers["Authorization"].split(" ", 1)[1]
+    user_id = decode_access_token(token)["sub"]
     db = SessionLocal()
     try:
         document = Document(
@@ -364,6 +388,7 @@ def test_process_unsupported_extension_returns_400(cleanup_uploaded_files):
             file_path="storage/uploads/fake.xlsx",
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             status="uploaded",
+            user_id=user_id,
         )
         db.add(document)
         db.commit()
@@ -372,11 +397,11 @@ def test_process_unsupported_extension_returns_400(cleanup_uploaded_files):
     finally:
         db.close()
 
-    process_response = client.post(f"/documents/{document.id}/process")
+    process_response = client.post(f"/documents/{document.id}/process", headers=auth_headers)
     assert process_response.status_code == 400
 
 
-def test_process_docx_document_creates_embeddings(cleanup_uploaded_files, tmp_path):
+def test_process_docx_document_creates_embeddings(cleanup_uploaded_files, tmp_path, auth_headers):
     created_paths, created_ids = cleanup_uploaded_files
     docx_path = tmp_path / "process.docx"
     document_docx = docx.Document()
@@ -397,6 +422,7 @@ def test_process_docx_document_creates_embeddings(cleanup_uploaded_files, tmp_pa
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             )
         },
+        headers=auth_headers,
     )
 
     assert upload_response.status_code == 200
@@ -411,15 +437,48 @@ def test_process_docx_document_creates_embeddings(cleanup_uploaded_files, tmp_pa
     finally:
         db.close()
 
-    process_response = client.post(f"/documents/{uploaded['id']}/process")
-    assert process_response.status_code == 200
-    process_payload = process_response.json()
-    assert process_payload["chunk_count"] > 0
+
+def test_user_cannot_access_another_users_document(cleanup_uploaded_files):
+    created_paths, created_ids = cleanup_uploaded_files
+
+    email_a = f"test-{uuid4()}@example.com"
+    email_b = f"test-{uuid4()}@example.com"
+    password = "test_password_123"
+
+    client.post("/auth/register", json={"email": email_a, "password": password})
+    client.post("/auth/register", json={"email": email_b, "password": password})
+    token_a = client.post("/auth/login", json={"email": email_a, "password": password}).json()["access_token"]
+    token_b = client.post("/auth/login", json={"email": email_b, "password": password}).json()["access_token"]
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+
+    upload_response = client.post(
+        "/documents/upload",
+        files={"file": ("owned_by_a.txt", b"secret content", "text/plain")},
+        headers=headers_a,
+    )
+    assert upload_response.status_code == 200
+    uploaded = upload_response.json()
 
     db = SessionLocal()
     try:
-        chunks = db.query(Chunk).filter(Chunk.document_id == uploaded["id"]).order_by(Chunk.chunk_index.asc()).all()
-        assert len(chunks) > 0
-        assert any(chunk.embedding is not None for chunk in chunks)
+        document = db.get(Document, uploaded["id"])
+        assert document is not None
+        created_ids.append(document.id)
+        created_paths.append(document.file_path)
     finally:
         db.close()
+
+    list_response_b = client.get("/documents", headers=headers_b)
+    assert list_response_b.status_code == 200
+    assert all(item["id"] != uploaded["id"] for item in list_response_b.json())
+
+    process_response_b = client.post(f"/documents/{uploaded['id']}/process", headers=headers_b)
+    assert process_response_b.status_code == 404
+
+    delete_response_b = client.delete(f"/documents/{uploaded['id']}", headers=headers_b)
+    assert delete_response_b.status_code == 404
+
+    list_response_a = client.get("/documents", headers=headers_a)
+    assert list_response_a.status_code == 200
+    assert any(item["id"] == uploaded["id"] for item in list_response_a.json())

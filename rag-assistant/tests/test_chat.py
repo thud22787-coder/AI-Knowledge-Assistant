@@ -1,6 +1,9 @@
+import uuid
+
 from app.database import SessionLocal
 from app.main import app
 from app.models import Chunk, Conversation, Document, Message
+from app.models import User
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 
@@ -32,14 +35,24 @@ def test_chat_with_no_matching_chunks_returns_fallback_answer():
 def test_chat_with_matching_chunks_returns_answer_with_sources():
     db = SessionLocal()
     document = None
+    user = None
     created_chunks: list[Chunk] = []
 
     try:
+        user = User(
+            email=f"test-{uuid.uuid4()}@example.com",
+            hashed_password="test_hash",
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
         document = Document(
             filename="chat-test.txt",
             file_path="storage/uploads/chat-test.txt",
             content_type="text/plain",
             status="ready",
+            user_id=user.id,
         )
         db.add(document)
         db.commit()
@@ -86,6 +99,8 @@ def test_chat_with_matching_chunks_returns_answer_with_sources():
             db.delete(chunk)
         if document is not None:
             db.delete(document)
+        if user is not None:
+            db.delete(user)
         db.commit()
         db.close()
 
@@ -144,12 +159,22 @@ def test_chat_persists_messages_for_conversation_sequence():
 def test_chat_passes_recent_history_to_generate_answer():
     db = SessionLocal()
     conversation = None
+    user = None
+    document = None
     created_chunks: list[Chunk] = []
     try:
         conversation = Conversation()
         db.add(conversation)
         db.commit()
         db.refresh(conversation)
+
+        user = User(
+            email=f"test-{uuid.uuid4()}@example.com",
+            hashed_password="test_hash",
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
 
         prior_user = Message(
             conversation_id=conversation.id,
@@ -173,6 +198,7 @@ def test_chat_passes_recent_history_to_generate_answer():
             file_path="storage/uploads/history-test.txt",
             content_type="text/plain",
             status="ready",
+            user_id=user.id,
         )
         db.add(document)
         db.commit()
@@ -225,5 +251,9 @@ def test_chat_passes_recent_history_to_generate_answer():
         if conversation is not None:
             db.query(Message).filter(Message.conversation_id == conversation.id).delete()
             db.delete(conversation)
+        if document is not None:
+            db.delete(document)
+        if user is not None:
+            db.delete(user)
         db.commit()
         db.close()

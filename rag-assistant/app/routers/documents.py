@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Chunk, Document
+from app.models import Chunk, Document, User
+from app.services.auth import get_current_user
 from app.services.embedder import embed_texts
 from app.services.chunker import chunk_text
 from app.services.parser import parse_docx, parse_pdf, parse_txt
@@ -17,7 +18,7 @@ ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
 
 @router.post("/upload")
-async def upload_document(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_document(file: UploadFile = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     suffix = Path(file.filename).suffix.lower()
     if suffix not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail="Only .pdf, .docx, .txt files are allowed")
@@ -35,6 +36,7 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
         filename=file.filename,
         file_path=str(file_path),
         content_type=file.content_type,
+        user_id=current_user.id,
     )
     db.add(document)
     db.commit()
@@ -44,8 +46,8 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
 
 
 @router.get("")
-def list_documents(db: Session = Depends(get_db)):
-    documents = db.query(Document).order_by(Document.created_at.desc()).all()
+def list_documents(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    documents = db.query(Document).filter(Document.user_id == current_user.id).order_by(Document.created_at.desc()).all()
     return [
         {
             "id": str(document.id),
@@ -59,9 +61,9 @@ def list_documents(db: Session = Depends(get_db)):
 
 
 @router.delete("/{document_id}")
-def delete_document(document_id: uuid.UUID, db: Session = Depends(get_db)):
+def delete_document(document_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     document = db.get(Document, document_id)
-    if document is None:
+    if document is None or document.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Document not found")
 
     file_path = Path(document.file_path)
@@ -76,9 +78,9 @@ def delete_document(document_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.post("/{document_id}/process")
-def process_document(document_id: uuid.UUID, db: Session = Depends(get_db)):
+def process_document(document_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     document = db.get(Document, document_id)
-    if document is None:
+    if document is None or document.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Document not found")
 
     suffix = Path(document.filename).suffix.lower()
