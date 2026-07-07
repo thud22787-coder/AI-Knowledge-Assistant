@@ -6,3 +6,8 @@ pgvector
 python-multipart
 python-dotenv
 pydantic-settings
+pymupdf
+python-docx
+sentence-transformers
+streamlit
+requests

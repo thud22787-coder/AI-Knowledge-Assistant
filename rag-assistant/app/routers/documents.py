@@ -8,7 +8,7 @@ from app.database import get_db
 from app.models import Chunk, Document
 from app.services.embedder import embed_texts
 from app.services.chunker import chunk_text
-from app.services.parser import parse_txt
+from app.services.parser import parse_docx, parse_pdf, parse_txt
 
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -81,11 +81,37 @@ def process_document(document_id: uuid.UUID, db: Session = Depends(get_db)):
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    if Path(document.filename).suffix.lower() != ".txt":
-        raise HTTPException(status_code=400, detail="Only .txt supported for now")
+    suffix = Path(document.filename).suffix.lower()
+    if suffix == ".txt":
+        text = parse_txt(document.file_path)
+        chunks = [
+            {**chunk_data, "page_number": None}
+            for chunk_data in chunk_text(text)
+        ]
+    elif suffix == ".docx":
+        text = parse_docx(document.file_path)
+        chunks = [
+            {**chunk_data, "page_number": None}
+            for chunk_data in chunk_text(text)
+        ]
+    elif suffix == ".pdf":
+        chunks = []
+        for page in parse_pdf(document.file_path):
+            page_chunks = chunk_text(page["text"])
+            chunks.extend(
+                {
+                    **chunk_data,
+                    "page_number": page["page_number"],
+                }
+                for chunk_data in page_chunks
+            )
+        chunks = [
+            {**chunk_data, "chunk_index": index}
+            for index, chunk_data in enumerate(chunks)
+        ]
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported file type")
 
-    text = parse_txt(document.file_path)
-    chunks = chunk_text(text)
     embeddings = embed_texts([chunk_data["text"] for chunk_data in chunks]) if chunks else []
 
     db.query(Chunk).filter(Chunk.document_id == document_id).delete()
@@ -95,6 +121,7 @@ def process_document(document_id: uuid.UUID, db: Session = Depends(get_db)):
             Chunk(
                 document_id=document_id,
                 chunk_index=chunk_data["chunk_index"],
+                page_number=chunk_data["page_number"],
                 text=chunk_data["text"],
                 embedding=embedding,
             )
