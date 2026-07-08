@@ -1,5 +1,6 @@
 from pathlib import Path
 from numbers import Real
+from unittest.mock import patch
 from uuid import uuid4
 
 import docx
@@ -251,6 +252,63 @@ def test_process_txt_document_creates_embeddings(cleanup_uploaded_files, auth_he
             assert all(isinstance(value, Real) and not isinstance(value, bool) for value in chunk.embedding)
     finally:
         db.close()
+
+
+def test_process_identical_file_content_uses_cache_and_skips_reprocessing(cleanup_uploaded_files, auth_headers):
+    created_paths, created_ids = cleanup_uploaded_files
+    text = (
+        "Paragraph one has enough text to make the parser and chunker work properly. "
+        "It should become at least one chunk.\n\n"
+        "Paragraph two also has enough content to ensure multiple paragraphs are handled. "
+        "This gives us more than one paragraph for the test."
+    )
+
+    upload_response_a = client.post(
+        "/documents/upload",
+        files={"file": ("cache_a.txt", text.encode("utf-8"), "text/plain")},
+        headers=auth_headers,
+    )
+
+    assert upload_response_a.status_code == 200
+    uploaded_a = upload_response_a.json()
+
+    db = SessionLocal()
+    try:
+        document_a = db.get(Document, uploaded_a["id"])
+        assert document_a is not None
+        created_ids.append(document_a.id)
+        created_paths.append(document_a.file_path)
+    finally:
+        db.close()
+
+    process_response_a = client.post(f"/documents/{uploaded_a['id']}/process", headers=auth_headers)
+    assert process_response_a.status_code == 200
+    chunk_count_a = process_response_a.json()["chunk_count"]
+
+    upload_response_b = client.post(
+        "/documents/upload",
+        files={"file": ("cache_b.txt", text.encode("utf-8"), "text/plain")},
+        headers=auth_headers,
+    )
+
+    assert upload_response_b.status_code == 200
+    uploaded_b = upload_response_b.json()
+
+    db = SessionLocal()
+    try:
+        document_b = db.get(Document, uploaded_b["id"])
+        assert document_b is not None
+        created_ids.append(document_b.id)
+        created_paths.append(document_b.file_path)
+    finally:
+        db.close()
+
+    with patch("app.routers.documents.embed_texts") as mock_embed_texts:
+        process_response_b = client.post(f"/documents/{uploaded_b['id']}/process", headers=auth_headers)
+
+    assert process_response_b.status_code == 200
+    assert process_response_b.json()["chunk_count"] == chunk_count_a
+    mock_embed_texts.assert_not_called()
 
 
 def test_process_pdf_document_creates_embeddings(cleanup_uploaded_files, tmp_path, auth_headers):

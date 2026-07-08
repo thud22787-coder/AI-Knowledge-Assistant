@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from app.services.parser import parse_docx, parse_pdf, parse_txt
 router = APIRouter(prefix="/documents", tags=["documents"])
 UPLOAD_DIR = Path("storage/uploads")
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt"}
+_document_processing_cache: dict[str, list[dict]] = {}
 
 
 @router.post("/upload")
@@ -84,52 +86,69 @@ def process_document(document_id: uuid.UUID, db: Session = Depends(get_db), curr
         raise HTTPException(status_code=404, detail="Document not found")
 
     suffix = Path(document.filename).suffix.lower()
-    if suffix == ".txt":
-        text = parse_txt(document.file_path)
-        chunks = [
-            {**chunk_data, "page_number": None}
-            for chunk_data in chunk_text(text)
-        ]
-    elif suffix == ".docx":
-        text = parse_docx(document.file_path)
-        chunks = [
-            {**chunk_data, "page_number": None}
-            for chunk_data in chunk_text(text)
-        ]
-    elif suffix == ".pdf":
-        chunks = []
-        for page in parse_pdf(document.file_path):
-            page_chunks = chunk_text(page["text"])
-            chunks.extend(
-                {
-                    **chunk_data,
-                    "page_number": page["page_number"],
-                }
-                for chunk_data in page_chunks
-            )
-        chunks = [
-            {**chunk_data, "chunk_index": index}
-            for index, chunk_data in enumerate(chunks)
-        ]
-    else:
+    if suffix not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail="Unsupported file type")
 
-    embeddings = embed_texts([chunk_data["text"] for chunk_data in chunks]) if chunks else []
+    file_bytes = Path(document.file_path).read_bytes()
+    file_hash = hashlib.sha256(file_bytes).hexdigest()
+
+    if file_hash in _document_processing_cache:
+        cached_chunks = _document_processing_cache[file_hash]
+    else:
+        if suffix == ".txt":
+            text = parse_txt(document.file_path)
+            chunks = [
+                {**chunk_data, "page_number": None}
+                for chunk_data in chunk_text(text)
+            ]
+        elif suffix == ".docx":
+            text = parse_docx(document.file_path)
+            chunks = [
+                {**chunk_data, "page_number": None}
+                for chunk_data in chunk_text(text)
+            ]
+        else:
+            chunks = []
+            for page in parse_pdf(document.file_path):
+                page_chunks = chunk_text(page["text"])
+                chunks.extend(
+                    {
+                        **chunk_data,
+                        "page_number": page["page_number"],
+                    }
+                    for chunk_data in page_chunks
+                )
+            chunks = [
+                {**chunk_data, "chunk_index": index}
+                for index, chunk_data in enumerate(chunks)
+            ]
+
+        embeddings = embed_texts([chunk_data["text"] for chunk_data in chunks]) if chunks else []
+        cached_chunks = [
+            {
+                "chunk_index": chunk_data["chunk_index"],
+                "page_number": chunk_data["page_number"],
+                "text": chunk_data["text"],
+                "embedding": embedding,
+            }
+            for chunk_data, embedding in zip(chunks, embeddings)
+        ]
+        _document_processing_cache[file_hash] = cached_chunks
 
     db.query(Chunk).filter(Chunk.document_id == document_id).delete()
 
-    for chunk_data, embedding in zip(chunks, embeddings):
+    for chunk_data in cached_chunks:
         db.add(
             Chunk(
                 document_id=document_id,
                 chunk_index=chunk_data["chunk_index"],
                 page_number=chunk_data["page_number"],
                 text=chunk_data["text"],
-                embedding=embedding,
+                embedding=chunk_data["embedding"],
             )
         )
 
     document.status = "ready"
     db.commit()
 
-    return {"document_id": str(document_id), "status": "ready", "chunk_count": len(chunks)}
+    return {"document_id": str(document_id), "status": "ready", "chunk_count": len(cached_chunks)}
