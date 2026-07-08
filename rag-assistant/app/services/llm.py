@@ -1,9 +1,13 @@
+import logging
+import time
+
 from openai import APIError, APIStatusError, APITimeoutError, OpenAI, RateLimitError
 
 from app.config import settings
 from app.models import Chunk, Message
 
 
+logger = logging.getLogger(__name__)
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 
@@ -43,6 +47,8 @@ def generate_answer(question: str, context_chunks: list[Chunk], history: list[Me
         }
     )
 
+    start_time = time.perf_counter()
+
     try:
         response = client.chat.completions.create(model=settings.OPENAI_MODEL, messages=messages)
     except APITimeoutError as exc:
@@ -53,5 +59,15 @@ def generate_answer(question: str, context_chunks: list[Chunk], history: list[Me
         raise LLMServiceError("LLM request failed with an API status error.") from exc
     except APIError as exc:
         raise LLMServiceError("LLM request failed due to an API error.") from exc
+
+    latency_ms = (time.perf_counter() - start_time) * 1000
+    logger.info(
+        "model=%s prompt_tokens=%s completion_tokens=%s total_tokens=%s latency_ms=%.2f",
+        settings.OPENAI_MODEL,
+        response.usage.prompt_tokens,
+        response.usage.completion_tokens,
+        response.usage.total_tokens,
+        latency_ms,
+    )
 
     return response.choices[0].message.content

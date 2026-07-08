@@ -1,3 +1,5 @@
+import logging
+import re
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -23,7 +25,12 @@ def test_generate_answer_builds_context_and_returns_content():
                     content="câu trả lời giả lập",
                 )
             )
-        ]
+        ],
+        usage=SimpleNamespace(
+            prompt_tokens=10,
+            completion_tokens=5,
+            total_tokens=15,
+        ),
     )
 
     with patch("app.services.llm.client.chat.completions.create", return_value=mock_response) as mock_create:
@@ -50,3 +57,35 @@ def test_generate_answer_raises_llm_service_error_on_timeout():
     with patch("app.services.llm.client.chat.completions.create", side_effect=timeout_error):
         with pytest.raises(LLMServiceError):
             generate_answer(question="Câu hỏi test", context_chunks=chunks)
+
+
+def test_generate_answer_logs_latency_and_token_usage(caplog):
+    chunks = [Chunk(text="Chunk test", page_number=1)]
+    mock_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content="câu trả lời giả lập",
+                )
+            )
+        ],
+        usage=SimpleNamespace(
+            prompt_tokens=100,
+            completion_tokens=50,
+            total_tokens=150,
+        ),
+    )
+
+    with caplog.at_level(logging.INFO), patch(
+        "app.services.llm.client.chat.completions.create",
+        return_value=mock_response,
+    ):
+        generate_answer(question="Câu hỏi test", context_chunks=chunks)
+
+    info_messages = [record.getMessage() for record in caplog.records if record.levelno == logging.INFO]
+
+    assert any("model" in message for message in info_messages)
+    assert any("prompt_tokens" in message and "100" in message for message in info_messages)
+    assert any("completion_tokens" in message and "50" in message for message in info_messages)
+    assert any("total_tokens" in message and "150" in message for message in info_messages)
+    assert any(re.search(r"latency_ms=\d+(\.\d+)?", message) for message in info_messages)
