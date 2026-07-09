@@ -15,3 +15,4 @@ alembic
 python-jose[cryptography]
 passlib[bcrypt]
 email-validator
+ragas==0.4.3

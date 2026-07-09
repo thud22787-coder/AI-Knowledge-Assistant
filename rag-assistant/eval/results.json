@@ -1,0 +1,122 @@
+[
+  {
+    "question": "Trong sample PDF, câu ở trang 1 là gì?",
+    "answer": "Trong sample PDF, câu ở trang 1 là: \"This is a PDF document for processing.\"",
+    "contexts": [
+      "DOCX paragraph one: alpha beta gamma.",
+      "This is a PDF document for processing.",
+      "DOCX paragraph one: alpha beta gamma. DOCX paragraph two: delta epsilon zeta.",
+      "This is the first DOCX paragraph for processing. It should be parsed into text and chunked.",
+      "DOCX paragraph two: delta epsilon zeta. DOCX paragraph three: eta theta iota."
+    ],
+    "ground_truth": "Page one: the quick brown fox jumps over the lazy dog."
+  },
+  {
+    "question": "Trong sample PDF, trang 2 nói câu nào?",
+    "answer": "Trong sample PDF, trang 2 nói câu \"delta epsilon zeta.\"",
+    "contexts": [
+      "DOCX paragraph one: alpha beta gamma. DOCX paragraph two: delta epsilon zeta.",
+      "DOCX paragraph one: alpha beta gamma.",
+      "This is a PDF document for processing.",
+      "DOCX paragraph two: delta epsilon zeta. DOCX paragraph three: eta theta iota.",
+      "Paragraph one has enough text to make the parser and chunker work properly. It should become at least one chunk."
+    ],
+    "ground_truth": "Page two: pack my box with five dozen liquor jugs."
+  },
+  {
+    "question": "Đoạn đầu tiên trong sample DOCX là gì?",
+    "answer": "Đoạn đầu tiên trong sample DOCX là: \"alpha beta gamma.\"",
+    "contexts": [
+      "This is a PDF document for processing.",
+      "This is the first DOCX paragraph for processing. It should be parsed into text and chunked.",
+      "DOCX paragraph one: alpha beta gamma.",
+      "DOCX paragraph one: alpha beta gamma. DOCX paragraph two: delta epsilon zeta.",
+      "essing. It should be parsed into text and chunked. This is the second DOCX paragraph for processing. It gives the test another paragraph to verify."
+    ],
+    "ground_truth": "DOCX paragraph one: alpha beta gamma."
+  },
+  {
+    "question": "Đoạn thứ hai trong sample DOCX là gì?",
+    "answer": "Đoạn thứ hai trong sample DOCX là: \"delta epsilon zeta.\"",
+    "contexts": [
+      "This is a PDF document for processing.",
+      "DOCX paragraph one: alpha beta gamma.",
+      "DOCX paragraph one: alpha beta gamma. DOCX paragraph two: delta epsilon zeta.",
+      "essing. It should be parsed into text and chunked. This is the second DOCX paragraph for processing. It gives the test another paragraph to verify.",
+      "DOCX paragraph two: delta epsilon zeta. DOCX paragraph three: eta theta iota."
+    ],
+    "ground_truth": "DOCX paragraph two: delta epsilon zeta."
+  },
+  {
+    "question": "Đoạn thứ ba trong sample DOCX là gì?",
+    "answer": "Đoạn thứ ba trong sample DOCX là: \"eta theta iota.\"",
+    "contexts": [
+      "This is a PDF document for processing.",
+      "DOCX paragraph one: alpha beta gamma.",
+      "DOCX paragraph one: alpha beta gamma. DOCX paragraph two: delta epsilon zeta.",
+      "DOCX paragraph two: delta epsilon zeta. DOCX paragraph three: eta theta iota.",
+      "essing. It should be parsed into text and chunked. This is the second DOCX paragraph for processing. It gives the test another paragraph to verify."
+    ],
+    "ground_truth": "DOCX paragraph three: eta theta iota."
+  },
+  {
+    "question": "File TXT dùng để test xử lý document nói gì ở đoạn đầu?",
+    "answer": "Đoạn đầu của file TXT nói rằng đây là một tài liệu PDF để xử lý.",
+    "contexts": [
+      "This is a PDF document for processing.",
+      "essing. It should be parsed into text and chunked. This is the second DOCX paragraph for processing. It gives the test another paragraph to verify.",
+      "This is the first DOCX paragraph for processing. It should be parsed into text and chunked.",
+      "ork properly. It should become at least one chunk. Paragraph two also has enough content to ensure multiple paragraphs are handled. This gives us more than one paragraph for the test.",
+      "Paragraph one has enough text to make the parser and chunker work properly. It should become at least one chunk."
+    ],
+    "ground_truth": "Paragraph one has enough text to make the parser and chunker work properly. It should become at least one chunk."
+  },
+  {
+    "question": "Trong file TXT process.txt, đoạn thứ hai nói gì?",
+    "answer": "Đoạn thứ hai trong file TXT process.txt nói rằng: \"This is the second DOCX paragraph for processing. It gives the test another paragraph to verify.\"",
+    "contexts": [
+      "DOCX paragraph one: alpha beta gamma.",
+      "This is a PDF document for processing.",
+      "essing. It should be parsed into text and chunked. This is the second DOCX paragraph for processing. It gives the test another paragraph to verify.",
+      "This is the first DOCX paragraph for processing. It should be parsed into text and chunked.",
+      "DOCX paragraph one: alpha beta gamma. DOCX paragraph two: delta epsilon zeta."
+    ],
+    "ground_truth": "Paragraph two also has enough content to ensure multiple paragraphs are handled. This gives us more than one paragraph for the test."
+  },
+  {
+    "question": "Nội dung của file PDF process.pdf là gì?",
+    "answer": "Nội dung của file PDF process.pdf bao gồm thông tin về các đoạn văn được xử lý từ định dạng DOCX, trong đó có hai đoạn văn:\n\n1. Đoạn một: \"This is the first DOCX paragraph for processing. It should be parsed into text and chunked.\"\n2. Đoạn hai: \"This is the second DOCX paragraph for processing. It gives the test another paragraph to verify.\"\n\nNgoài ra, còn có thông tin về các từ khóa \"alpha beta gamma\" và \"delta epsilon zeta\" được đề cập.",
+    "contexts": [
+      "This is a PDF document for processing.",
+      "DOCX paragraph one: alpha beta gamma.",
+      "This is the first DOCX paragraph for processing. It should be parsed into text and chunked.",
+      "DOCX paragraph one: alpha beta gamma. DOCX paragraph two: delta epsilon zeta.",
+      "essing. It should be parsed into text and chunked. This is the second DOCX paragraph for processing. It gives the test another paragraph to verify."
+    ],
+    "ground_truth": "This is a PDF document for processing."
+  },
+  {
+    "question": "Đoạn đầu tiên trong file DOCX process.docx là gì?",
+    "answer": "Đoạn đầu tiên trong file DOCX process.docx là: \"This is a PDF document for processing.\"",
+    "contexts": [
+      "This is the first DOCX paragraph for processing. It should be parsed into text and chunked.",
+      "This is a PDF document for processing.",
+      "essing. It should be parsed into text and chunked. This is the second DOCX paragraph for processing. It gives the test another paragraph to verify.",
+      "DOCX paragraph one: alpha beta gamma. DOCX paragraph two: delta epsilon zeta.",
+      "DOCX paragraph one: alpha beta gamma."
+    ],
+    "ground_truth": "This is the first DOCX paragraph for processing. It should be parsed into text and chunked."
+  },
+  {
+    "question": "Đoạn thứ hai trong file DOCX process.docx là gì?",
+    "answer": "Đoạn thứ hai trong file DOCX process.docx là: \"delta epsilon zeta.\"",
+    "contexts": [
+      "This is a PDF document for processing.",
+      "essing. It should be parsed into text and chunked. This is the second DOCX paragraph for processing. It gives the test another paragraph to verify.",
+      "This is the first DOCX paragraph for processing. It should be parsed into text and chunked.",
+      "DOCX paragraph one: alpha beta gamma.",
+      "DOCX paragraph one: alpha beta gamma. DOCX paragraph two: delta epsilon zeta."
+    ],
+    "ground_truth": "This is the second DOCX paragraph for processing. It gives the test another paragraph to verify."
+  }
+]

@@ -1,0 +1,976 @@
+Help on package ragas.metrics.collections.answer_relevancy in ragas.metrics.collections:
+
+NAME
+    ragas.metrics.collections.answer_relevancy - Answer Relevancy metrics v2 - Modern implementation.
+
+PACKAGE CONTENTS
+    metric
+    util
+
+CLASSES
+    ragas.metrics.collections.base.BaseMetric(ragas.metrics.base.SimpleBaseMetric, ragas.metrics.validators.NumericValidator)
+        ragas.metrics.collections.answer_relevancy.metric.AnswerRelevancy
+
+    class AnswerRelevancy(ragas.metrics.collections.base.BaseMetric)
+     |  AnswerRelevancy(
+     |      llm: 'InstructorBaseRagasLLM',
+     |      embeddings: 'BaseRagasEmbedding',
+     |      name: str = 'answer_relevancy',
+     |      strictness: int = 3,
+     |      **kwargs
+     |  )
+     |
+     |  Modern v2 implementation of answer relevancy evaluation.
+     |
+     |  Evaluates answer relevancy by generating multiple questions from the response
+     |  and comparing them to the original question using cosine similarity.
+     |  The metric detects evasive/noncommittal answers.
+     |
+     |  This implementation uses modern instructor LLMs with structured output
+     |  and modern embeddings for semantic comparison.
+     |  Only supports modern components - legacy wrappers are rejected with clear error messages.
+     |
+     |  Usage:
+     |      >>> import openai
+     |      >>> from ragas.llms.base import llm_factory
+     |      >>> from ragas.embeddings.base import embedding_factory
+     |      >>> from ragas.metrics.collections import AnswerRelevancy
+     |      >>>
+     |      >>> # Setup dependencies
+     |      >>> client = openai.AsyncOpenAI()
+     |      >>> llm = llm_factory("gpt-4o-mini", client=client)
+     |      >>> embeddings = embedding_factory("openai", model="text-embedding-ada-002", client=client)
+     |      >>>
+     |      >>> # Create metric instance
+     |      >>> metric = AnswerRelevancy(llm=llm, embeddings=embeddings, strictness=3)
+     |      >>>
+     |      >>> # Single evaluation
+     |      >>> result = await metric.ascore(
+     |      ...     user_input="What is the capital of France?",
+     |      ...     response="Paris is the capital of France."
+     |      ... )
+     |      >>> print(f"Answer Relevancy: {result.value}")
+     |
+     |  Attributes:
+     |      llm: Modern instructor-based LLM for question generation
+     |      embeddings: Modern embeddings model for semantic comparison
+     |      name: The metric name
+     |      strictness: Number of questions to generate (default: 3)
+     |      allowed_values: Score range (0.0 to 1.0, higher is better)
+     |
+     |  Method resolution order:
+     |      AnswerRelevancy
+     |      ragas.metrics.collections.base.BaseMetric
+     |      ragas.metrics.base.SimpleBaseMetric
+     |      ragas.metrics.validators.NumericValidator
+     |      ragas.metrics.validators.BaseValidator
+     |      abc.ABC
+     |      builtins.object
+     |
+     |  Methods defined here:
+     |
+     |  __init__(
+     |      self,
+     |      llm: 'InstructorBaseRagasLLM',
+     |      embeddings: 'BaseRagasEmbedding',
+     |      name: str = 'answer_relevancy',
+     |      strictness: int = 3,
+     |      **kwargs
+     |  )
+     |      Initialize AnswerRelevancy metric with required components.
+     |
+     |      Args:
+     |          llm: Modern instructor-based LLM for question generation
+     |          embeddings: Modern embeddings model for semantic comparison
+     |          name: The metric name (default: "answer_relevancy")
+     |          strictness: Number of questions to generate (default: 3)
+     |          **kwargs: Additional arguments passed to BaseMetric
+     |
+     |  async ascore(self, user_input: str, response: str) -> ragas.metrics.result.MetricResult
+     |      Calculate answer relevancy score asynchronously.
+     |
+     |      Components are guaranteed to be validated and non-None by the base class.
+     |
+     |      Args:
+     |          user_input: The original question
+     |          response: The response to evaluate
+     |
+     |      Returns:
+     |          MetricResult with relevancy score (0.0-1.0, higher is better)
+     |
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |
+     |  __abstractmethods__ = frozenset()
+     |
+     |  __annotations__ = {'embeddings': 'BaseRagasEmbedding', 'llm': 'Instruc...
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ragas.metrics.collections.base.BaseMetric:
+     |
+     |  batch_score(self, inputs: List[Dict[str, Any]]) -> List[ragas.metrics.result.MetricResult]
+     |      Synchronous batch scoring that wraps abatch_score().
+     |
+     |      This is a convenience method for backward compatibility and sync usage.
+     |      For better performance, prefer using abatch_score() directly in async contexts.
+     |
+     |      Args:
+     |          inputs: List of input dictionaries for scoring
+     |
+     |      Returns:
+     |          List of MetricResult objects
+     |
+     |  score(self, **kwargs) -> ragas.metrics.result.MetricResult
+     |      Synchronous scoring method that wraps ascore().
+     |
+     |      This is a convenience method for backward compatibility and sync usage.
+     |      For better performance, prefer using ascore() directly in async contexts.
+     |
+     |      Returns:
+     |          MetricResult object
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ragas.metrics.base.SimpleBaseMetric:
+     |
+     |  __eq__(self, other)
+     |      Return self==value.
+     |
+     |  __replace__ = _replace(self, /, **changes) from dataclasses
+     |
+     |  __repr__(self)
+     |      Return repr(self).
+     |
+     |  async abatch_score(self, inputs: 't.List[t.Dict[str, t.Any]]') -> "t.List['MetricResult']"
+     |      Asynchronously calculate scores for a batch of inputs in parallel.
+     |
+     |      Parameters
+     |      ----------
+     |      inputs : List[Dict[str, Any]]
+     |          List of input dictionaries, each containing parameters for the metric.
+     |
+     |      Returns
+     |      -------
+     |      List[MetricResult]
+     |          List of evaluation results, one for each input.
+     |
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from ragas.metrics.base.SimpleBaseMetric:
+     |
+     |  __dict__
+     |      dictionary for instance variables
+     |
+     |  __weakref__
+     |      list of weak references to the object
+     |
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes inherited from ragas.metrics.base.SimpleBaseMetric:
+     |
+     |  __dataclass_fields__ = {'allowed_values': Field(name='allowed_values',...
+     |
+     |  __dataclass_params__ = _DataclassParams(init=True,repr=True,eq=True,or...
+     |
+     |  __hash__ = None
+     |
+     |  __match_args__ = ('name', 'allowed_values')
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ragas.metrics.validators.NumericValidator:
+     |
+     |  validate_result_value(self, result_value: Any) -> Optional[str]
+     |      Validate that result value is within the numeric range.
+
+DATA
+    __all__ = ['AnswerRelevancy']
+
+FILE
+    c:\users\thu\appdata\local\packages\pythonsoftwarefoundation.python.3.13_qbz5n2kfra8p0\localcache\local-packages\python313\site-packages\ragas\metrics\collections\answer_relevancy\__init__.py
+
+
+Help on package ragas.metrics.collections.context_precision in ragas.metrics.collections:
+
+NAME
+    ragas.metrics.collections.context_precision - Context Precision metrics v2 - Modern implementation.
+
+PACKAGE CONTENTS
+    metric
+    util
+
+CLASSES
+    ragas.metrics.collections.base.BaseMetric(ragas.metrics.base.SimpleBaseMetric, ragas.metrics.validators.NumericValidator)
+        ragas.metrics.collections.context_precision.metric.ContextPrecisionWithReference
+            ragas.metrics.collections.context_precision.metric.ContextPrecision
+        ragas.metrics.collections.context_precision.metric.ContextPrecisionWithoutReference
+            ragas.metrics.collections.context_precision.metric.ContextUtilization
+
+    class ContextPrecision(ContextPrecisionWithReference)
+     |  ContextPrecision(llm: 'InstructorBaseRagasLLM', **kwargs)
+     |
+     |  Modern v2 wrapper for ContextPrecisionWithReference with shorter name.
+     |
+     |  This is a simple wrapper that provides the legacy "context_precision" name
+     |  while using the modern V2 implementation underneath.
+     |
+     |  Usage:
+     |      >>> import openai
+     |      >>> from ragas.llms.base import llm_factory
+     |      >>> from ragas.metrics.collections import ContextPrecision
+     |      >>>
+     |      >>> # Setup dependencies
+     |      >>> client = openai.AsyncOpenAI()
+     |      >>> llm = llm_factory("gpt-4o-mini", client=client)
+     |      >>>
+     |      >>> # Create metric instance (same as ContextPrecisionWithReference)
+     |      >>> metric = ContextPrecision(llm=llm)
+     |      >>>
+     |      >>> # Single evaluation
+     |      >>> result = await metric.ascore(
+     |      ...     user_input="What is the capital of France?",
+     |      ...     reference="Paris is the capital of France.",
+     |      ...     retrieved_contexts=["Paris is the capital and largest city of France."]
+     |      ... )
+     |
+     |  Method resolution order:
+     |      ContextPrecision
+     |      ContextPrecisionWithReference
+     |      ragas.metrics.collections.base.BaseMetric
+     |      ragas.metrics.base.SimpleBaseMetric
+     |      ragas.metrics.validators.NumericValidator
+     |      ragas.metrics.validators.BaseValidator
+     |      abc.ABC
+     |      builtins.object
+     |
+     |  Methods defined here:
+     |
+     |  __init__(self, llm: 'InstructorBaseRagasLLM', **kwargs)
+     |      Initialize ContextPrecision with the legacy default name.
+     |
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |
+     |  __abstractmethods__ = frozenset()
+     |
+     |  __annotations__ = {}
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ContextPrecisionWithReference:
+     |
+     |  async ascore(self, user_input: str, reference: str, retrieved_contexts: List[str]) -> ragas.metrics.result.MetricResult
+     |      Calculate context precision score using reference.
+     |
+     |      Args:
+     |          user_input: The question being asked
+     |          reference: The reference answer to compare against
+     |          retrieved_contexts: The retrieved contexts to evaluate
+     |
+     |      Returns:
+     |          MetricResult with context precision score (0.0-1.0, higher is better)
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ragas.metrics.collections.base.BaseMetric:
+     |
+     |  batch_score(self, inputs: List[Dict[str, Any]]) -> List[ragas.metrics.result.MetricResult]
+     |      Synchronous batch scoring that wraps abatch_score().
+     |
+     |      This is a convenience method for backward compatibility and sync usage.
+     |      For better performance, prefer using abatch_score() directly in async contexts.
+     |
+     |      Args:
+     |          inputs: List of input dictionaries for scoring
+     |
+     |      Returns:
+     |          List of MetricResult objects
+     |
+     |  score(self, **kwargs) -> ragas.metrics.result.MetricResult
+     |      Synchronous scoring method that wraps ascore().
+     |
+     |      This is a convenience method for backward compatibility and sync usage.
+     |      For better performance, prefer using ascore() directly in async contexts.
+     |
+     |      Returns:
+     |          MetricResult object
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ragas.metrics.base.SimpleBaseMetric:
+     |
+     |  __eq__(self, other)
+     |      Return self==value.
+     |
+     |  __replace__ = _replace(self, /, **changes) from dataclasses
+     |
+     |  __repr__(self)
+     |      Return repr(self).
+     |
+     |  async abatch_score(self, inputs: 't.List[t.Dict[str, t.Any]]') -> "t.List['MetricResult']"
+     |      Asynchronously calculate scores for a batch of inputs in parallel.
+     |
+     |      Parameters
+     |      ----------
+     |      inputs : List[Dict[str, Any]]
+     |          List of input dictionaries, each containing parameters for the metric.
+     |
+     |      Returns
+     |      -------
+     |      List[MetricResult]
+     |          List of evaluation results, one for each input.
+     |
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from ragas.metrics.base.SimpleBaseMetric:
+     |
+     |  __dict__
+     |      dictionary for instance variables
+     |
+     |  __weakref__
+     |      list of weak references to the object
+     |
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes inherited from ragas.metrics.base.SimpleBaseMetric:
+     |
+     |  __dataclass_fields__ = {'allowed_values': Field(name='allowed_values',...
+     |
+     |  __dataclass_params__ = _DataclassParams(init=True,repr=True,eq=True,or...
+     |
+     |  __hash__ = None
+     |
+     |  __match_args__ = ('name', 'allowed_values')
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ragas.metrics.validators.NumericValidator:
+     |
+     |  validate_result_value(self, result_value: Any) -> Optional[str]
+     |      Validate that result value is within the numeric range.
+
+    class ContextPrecisionWithReference(ragas.metrics.collections.base.BaseMetric)
+     |  ContextPrecisionWithReference(
+     |      llm: 'InstructorBaseRagasLLM',
+     |      name: str = 'context_precision_with_reference',
+     |      **kwargs
+     |  )
+     |
+     |  Modern v2 implementation of context precision with reference.
+     |
+     |  Evaluates whether retrieved contexts are useful for answering a question by comparing
+     |  each context against a reference answer. The metric calculates average precision
+     |  based on the usefulness verdicts from an LLM.
+     |
+     |  This implementation uses modern instructor LLMs with structured output.
+     |  Only supports modern components - legacy wrappers are rejected with clear error messages.
+     |
+     |  Usage:
+     |      >>> import openai
+     |      >>> from ragas.llms.base import llm_factory
+     |      >>> from ragas.metrics.collections import ContextPrecisionWithReference
+     |      >>>
+     |      >>> # Setup dependencies
+     |      >>> client = openai.AsyncOpenAI()
+     |      >>> llm = llm_factory("gpt-4o-mini", client=client)
+     |      >>>
+     |      >>> # Create metric instance
+     |      >>> metric = ContextPrecisionWithReference(llm=llm)
+     |      >>>
+     |      >>> # Single evaluation
+     |      >>> result = await metric.ascore(
+     |      ...     user_input="What is the capital of France?",
+     |      ...     reference="Paris is the capital of France.",
+     |      ...     retrieved_contexts=["Paris is the capital and largest city of France.", "Berlin is the capital of Germany."]
+     |      ... )
+     |      >>> print(f"Context Precision: {result.value}")
+     |
+     |  Attributes:
+     |      llm: Modern instructor-based LLM for context evaluation
+     |      name: The metric name
+     |      allowed_values: Score range (0.0 to 1.0, higher is better)
+     |
+     |  Method resolution order:
+     |      ContextPrecisionWithReference
+     |      ragas.metrics.collections.base.BaseMetric
+     |      ragas.metrics.base.SimpleBaseMetric
+     |      ragas.metrics.validators.NumericValidator
+     |      ragas.metrics.validators.BaseValidator
+     |      abc.ABC
+     |      builtins.object
+     |
+     |  Methods defined here:
+     |
+     |  __init__(
+     |      self,
+     |      llm: 'InstructorBaseRagasLLM',
+     |      name: str = 'context_precision_with_reference',
+     |      **kwargs
+     |  )
+     |      Initialize ContextPrecisionWithReference metric with required components.
+     |
+     |      Args:
+     |          llm: Modern instructor-based LLM for context evaluation
+     |          name: The metric name
+     |
+     |  async ascore(self, user_input: str, reference: str, retrieved_contexts: List[str]) -> ragas.metrics.result.MetricResult
+     |      Calculate context precision score using reference.
+     |
+     |      Args:
+     |          user_input: The question being asked
+     |          reference: The reference answer to compare against
+     |          retrieved_contexts: The retrieved contexts to evaluate
+     |
+     |      Returns:
+     |          MetricResult with context precision score (0.0-1.0, higher is better)
+     |
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |
+     |  __abstractmethods__ = frozenset()
+     |
+     |  __annotations__ = {'llm': 'InstructorBaseRagasLLM'}
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ragas.metrics.collections.base.BaseMetric:
+     |
+     |  batch_score(self, inputs: List[Dict[str, Any]]) -> List[ragas.metrics.result.MetricResult]
+     |      Synchronous batch scoring that wraps abatch_score().
+     |
+     |      This is a convenience method for backward compatibility and sync usage.
+     |      For better performance, prefer using abatch_score() directly in async contexts.
+     |
+     |      Args:
+     |          inputs: List of input dictionaries for scoring
+     |
+     |      Returns:
+     |          List of MetricResult objects
+     |
+     |  score(self, **kwargs) -> ragas.metrics.result.MetricResult
+     |      Synchronous scoring method that wraps ascore().
+     |
+     |      This is a convenience method for backward compatibility and sync usage.
+     |      For better performance, prefer using ascore() directly in async contexts.
+     |
+     |      Returns:
+     |          MetricResult object
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ragas.metrics.base.SimpleBaseMetric:
+     |
+     |  __eq__(self, other)
+     |      Return self==value.
+     |
+     |  __replace__ = _replace(self, /, **changes) from dataclasses
+     |
+     |  __repr__(self)
+     |      Return repr(self).
+     |
+     |  async abatch_score(self, inputs: 't.List[t.Dict[str, t.Any]]') -> "t.List['MetricResult']"
+     |      Asynchronously calculate scores for a batch of inputs in parallel.
+     |
+     |      Parameters
+     |      ----------
+     |      inputs : List[Dict[str, Any]]
+     |          List of input dictionaries, each containing parameters for the metric.
+     |
+     |      Returns
+     |      -------
+     |      List[MetricResult]
+     |          List of evaluation results, one for each input.
+     |
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from ragas.metrics.base.SimpleBaseMetric:
+     |
+     |  __dict__
+     |      dictionary for instance variables
+     |
+     |  __weakref__
+     |      list of weak references to the object
+     |
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes inherited from ragas.metrics.base.SimpleBaseMetric:
+     |
+     |  __dataclass_fields__ = {'allowed_values': Field(name='allowed_values',...
+     |
+     |  __dataclass_params__ = _DataclassParams(init=True,repr=True,eq=True,or...
+     |
+     |  __hash__ = None
+     |
+     |  __match_args__ = ('name', 'allowed_values')
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ragas.metrics.validators.NumericValidator:
+     |
+     |  validate_result_value(self, result_value: Any) -> Optional[str]
+     |      Validate that result value is within the numeric range.
+
+    class ContextPrecisionWithoutReference(ragas.metrics.collections.base.BaseMetric)
+     |  ContextPrecisionWithoutReference(
+     |      llm: 'InstructorBaseRagasLLM',
+     |      name: str = 'context_precision_without_reference',
+     |      **kwargs
+     |  )
+     |
+     |  Modern v2 implementation of context precision without reference.
+     |
+     |  Evaluates whether retrieved contexts are useful for answering a question by comparing
+     |  each context against the generated response. The metric calculates average precision
+     |  based on the usefulness verdicts from an LLM.
+     |
+     |  This implementation uses modern instructor LLMs with structured output.
+     |  Only supports modern components - legacy wrappers are rejected with clear error messages.
+     |
+     |  Usage:
+     |      >>> import openai
+     |      >>> from ragas.llms.base import llm_factory
+     |      >>> from ragas.metrics.collections import ContextPrecisionWithoutReference
+     |      >>>
+     |      >>> # Setup dependencies
+     |      >>> client = openai.AsyncOpenAI()
+     |      >>> llm = llm_factory("gpt-4o-mini", client=client)
+     |      >>>
+     |      >>> # Create metric instance
+     |      >>> metric = ContextPrecisionWithoutReference(llm=llm)
+     |      >>>
+     |      >>> # Single evaluation
+     |      >>> result = await metric.ascore(
+     |      ...     user_input="What is the capital of France?",
+     |      ...     response="Paris is the capital of France.",
+     |      ...     retrieved_contexts=["Paris is the capital and largest city of France.", "Berlin is the capital of Germany."]
+     |      ... )
+     |      >>> print(f"Context Precision: {result.value}")
+     |
+     |  Attributes:
+     |      llm: Modern instructor-based LLM for context evaluation
+     |      name: The metric name
+     |      allowed_values: Score range (0.0 to 1.0, higher is better)
+     |
+     |  Method resolution order:
+     |      ContextPrecisionWithoutReference
+     |      ragas.metrics.collections.base.BaseMetric
+     |      ragas.metrics.base.SimpleBaseMetric
+     |      ragas.metrics.validators.NumericValidator
+     |      ragas.metrics.validators.BaseValidator
+     |      abc.ABC
+     |      builtins.object
+     |
+     |  Methods defined here:
+     |
+     |  __init__(
+     |      self,
+     |      llm: 'InstructorBaseRagasLLM',
+     |      name: str = 'context_precision_without_reference',
+     |      **kwargs
+     |  )
+     |      Initialize ContextPrecisionWithoutReference metric with required components.
+     |
+     |      Args:
+     |          llm: Modern instructor-based LLM for context evaluation
+     |          name: The metric name
+     |
+     |  async ascore(self, user_input: str, response: str, retrieved_contexts: List[str]) -> ragas.metrics.result.MetricResult
+     |      Calculate context precision score using response.
+     |
+     |      Args:
+     |          user_input: The question being asked
+     |          response: The response that was generated
+     |          retrieved_contexts: The retrieved contexts to evaluate
+     |
+     |      Returns:
+     |          MetricResult with context precision score (0.0-1.0, higher is better)
+     |
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |
+     |  __abstractmethods__ = frozenset()
+     |
+     |  __annotations__ = {'llm': 'InstructorBaseRagasLLM'}
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ragas.metrics.collections.base.BaseMetric:
+     |
+     |  batch_score(self, inputs: List[Dict[str, Any]]) -> List[ragas.metrics.result.MetricResult]
+     |      Synchronous batch scoring that wraps abatch_score().
+     |
+     |      This is a convenience method for backward compatibility and sync usage.
+     |      For better performance, prefer using abatch_score() directly in async contexts.
+     |
+     |      Args:
+     |          inputs: List of input dictionaries for scoring
+     |
+     |      Returns:
+     |          List of MetricResult objects
+     |
+     |  score(self, **kwargs) -> ragas.metrics.result.MetricResult
+     |      Synchronous scoring method that wraps ascore().
+     |
+     |      This is a convenience method for backward compatibility and sync usage.
+     |      For better performance, prefer using ascore() directly in async contexts.
+     |
+     |      Returns:
+     |          MetricResult object
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ragas.metrics.base.SimpleBaseMetric:
+     |
+     |  __eq__(self, other)
+     |      Return self==value.
+     |
+     |  __replace__ = _replace(self, /, **changes) from dataclasses
+     |
+     |  __repr__(self)
+     |      Return repr(self).
+     |
+     |  async abatch_score(self, inputs: 't.List[t.Dict[str, t.Any]]') -> "t.List['MetricResult']"
+     |      Asynchronously calculate scores for a batch of inputs in parallel.
+     |
+     |      Parameters
+     |      ----------
+     |      inputs : List[Dict[str, Any]]
+     |          List of input dictionaries, each containing parameters for the metric.
+     |
+     |      Returns
+     |      -------
+     |      List[MetricResult]
+     |          List of evaluation results, one for each input.
+     |
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from ragas.metrics.base.SimpleBaseMetric:
+     |
+     |  __dict__
+     |      dictionary for instance variables
+     |
+     |  __weakref__
+     |      list of weak references to the object
+     |
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes inherited from ragas.metrics.base.SimpleBaseMetric:
+     |
+     |  __dataclass_fields__ = {'allowed_values': Field(name='allowed_values',...
+     |
+     |  __dataclass_params__ = _DataclassParams(init=True,repr=True,eq=True,or...
+     |
+     |  __hash__ = None
+     |
+     |  __match_args__ = ('name', 'allowed_values')
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ragas.metrics.validators.NumericValidator:
+     |
+     |  validate_result_value(self, result_value: Any) -> Optional[str]
+     |      Validate that result value is within the numeric range.
+
+    class ContextUtilization(ContextPrecisionWithoutReference)
+     |  ContextUtilization(llm: 'InstructorBaseRagasLLM', **kwargs)
+     |
+     |  Modern v2 wrapper for ContextPrecisionWithoutReference with shorter name.
+     |
+     |  This is a simple wrapper that provides the legacy "context_utilization" name
+     |  while using the modern V2 implementation underneath.
+     |
+     |  Usage:
+     |      >>> import openai
+     |      >>> from ragas.llms.base import llm_factory
+     |      >>> from ragas.metrics.collections import ContextUtilization
+     |      >>>
+     |      >>> # Setup dependencies
+     |      >>> client = openai.AsyncOpenAI()
+     |      >>> llm = llm_factory("gpt-4o-mini", client=client)
+     |      >>>
+     |      >>> # Create metric instance (same as ContextPrecisionWithoutReference)
+     |      >>> metric = ContextUtilization(llm=llm)
+     |      >>>
+     |      >>> # Single evaluation
+     |      >>> result = await metric.ascore(
+     |      ...     user_input="What is the capital of France?",
+     |      ...     response="Paris is the capital of France.",
+     |      ...     retrieved_contexts=["Paris is the capital and largest city of France."]
+     |      ... )
+     |
+     |  Method resolution order:
+     |      ContextUtilization
+     |      ContextPrecisionWithoutReference
+     |      ragas.metrics.collections.base.BaseMetric
+     |      ragas.metrics.base.SimpleBaseMetric
+     |      ragas.metrics.validators.NumericValidator
+     |      ragas.metrics.validators.BaseValidator
+     |      abc.ABC
+     |      builtins.object
+     |
+     |  Methods defined here:
+     |
+     |  __init__(self, llm: 'InstructorBaseRagasLLM', **kwargs)
+     |      Initialize ContextUtilization with the legacy default name.
+     |
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |
+     |  __abstractmethods__ = frozenset()
+     |
+     |  __annotations__ = {}
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ContextPrecisionWithoutReference:
+     |
+     |  async ascore(self, user_input: str, response: str, retrieved_contexts: List[str]) -> ragas.metrics.result.MetricResult
+     |      Calculate context precision score using response.
+     |
+     |      Args:
+     |          user_input: The question being asked
+     |          response: The response that was generated
+     |          retrieved_contexts: The retrieved contexts to evaluate
+     |
+     |      Returns:
+     |          MetricResult with context precision score (0.0-1.0, higher is better)
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ragas.metrics.collections.base.BaseMetric:
+     |
+     |  batch_score(self, inputs: List[Dict[str, Any]]) -> List[ragas.metrics.result.MetricResult]
+     |      Synchronous batch scoring that wraps abatch_score().
+     |
+     |      This is a convenience method for backward compatibility and sync usage.
+     |      For better performance, prefer using abatch_score() directly in async contexts.
+     |
+     |      Args:
+     |          inputs: List of input dictionaries for scoring
+     |
+     |      Returns:
+     |          List of MetricResult objects
+     |
+     |  score(self, **kwargs) -> ragas.metrics.result.MetricResult
+     |      Synchronous scoring method that wraps ascore().
+     |
+     |      This is a convenience method for backward compatibility and sync usage.
+     |      For better performance, prefer using ascore() directly in async contexts.
+     |
+     |      Returns:
+     |          MetricResult object
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ragas.metrics.base.SimpleBaseMetric:
+     |
+     |  __eq__(self, other)
+     |      Return self==value.
+     |
+     |  __replace__ = _replace(self, /, **changes) from dataclasses
+     |
+     |  __repr__(self)
+     |      Return repr(self).
+     |
+     |  async abatch_score(self, inputs: 't.List[t.Dict[str, t.Any]]') -> "t.List['MetricResult']"
+     |      Asynchronously calculate scores for a batch of inputs in parallel.
+     |
+     |      Parameters
+     |      ----------
+     |      inputs : List[Dict[str, Any]]
+     |          List of input dictionaries, each containing parameters for the metric.
+     |
+     |      Returns
+     |      -------
+     |      List[MetricResult]
+     |          List of evaluation results, one for each input.
+     |
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from ragas.metrics.base.SimpleBaseMetric:
+     |
+     |  __dict__
+     |      dictionary for instance variables
+     |
+     |  __weakref__
+     |      list of weak references to the object
+     |
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes inherited from ragas.metrics.base.SimpleBaseMetric:
+     |
+     |  __dataclass_fields__ = {'allowed_values': Field(name='allowed_values',...
+     |
+     |  __dataclass_params__ = _DataclassParams(init=True,repr=True,eq=True,or...
+     |
+     |  __hash__ = None
+     |
+     |  __match_args__ = ('name', 'allowed_values')
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ragas.metrics.validators.NumericValidator:
+     |
+     |  validate_result_value(self, result_value: Any) -> Optional[str]
+     |      Validate that result value is within the numeric range.
+
+DATA
+    __all__ = ['ContextPrecision', 'ContextPrecisionWithReference', 'Conte...
+
+FILE
+    c:\users\thu\appdata\local\packages\pythonsoftwarefoundation.python.3.13_qbz5n2kfra8p0\localcache\local-packages\python313\site-packages\ragas\metrics\collections\context_precision\__init__.py
+
+
+Help on package ragas.metrics.collections.context_recall in ragas.metrics.collections:
+
+NAME
+    ragas.metrics.collections.context_recall - Context Recall metrics v2 - Modern implementation.
+
+PACKAGE CONTENTS
+    metric
+    util
+
+CLASSES
+    ragas.metrics.collections.base.BaseMetric(ragas.metrics.base.SimpleBaseMetric, ragas.metrics.validators.NumericValidator)
+        ragas.metrics.collections.context_recall.metric.ContextRecall
+
+    class ContextRecall(ragas.metrics.collections.base.BaseMetric)
+     |  ContextRecall(
+     |      llm: 'InstructorBaseRagasLLM',
+     |      name: str = 'context_recall',
+     |      **kwargs
+     |  )
+     |
+     |  Modern v2 implementation of context recall evaluation.
+     |
+     |  Evaluates context recall by classifying if statements in a reference answer
+     |  can be attributed to the retrieved context. Uses an LLM to verify attribution
+     |  for each statement and calculates recall as the proportion of attributed statements.
+     |
+     |  This implementation uses modern instructor LLMs with structured output.
+     |  Only supports modern components - legacy wrappers are rejected with clear error messages.
+     |
+     |  Usage:
+     |      >>> import openai
+     |      >>> from ragas.llms.base import llm_factory
+     |      >>> from ragas.metrics.collections import ContextRecall
+     |      >>>
+     |      >>> # Setup dependencies
+     |      >>> client = openai.AsyncOpenAI()
+     |      >>> llm = llm_factory("gpt-4o-mini", client=client)
+     |      >>>
+     |      >>> # Create metric instance
+     |      >>> metric = ContextRecall(llm=llm)
+     |      >>>
+     |      >>> # Single evaluation
+     |      >>> result = await metric.ascore(
+     |      ...     user_input="What is the capital of France?",
+     |      ...     retrieved_contexts=["Paris is the capital of France."],
+     |      ...     reference="Paris is the capital and largest city of France."
+     |      ... )
+     |      >>> print(f"Context Recall: {result.value}")
+     |
+     |  Attributes:
+     |      llm: Modern instructor-based LLM for statement classification
+     |      name: The metric name
+     |      allowed_values: Score range (0.0 to 1.0, higher is better)
+     |
+     |  Method resolution order:
+     |      ContextRecall
+     |      ragas.metrics.collections.base.BaseMetric
+     |      ragas.metrics.base.SimpleBaseMetric
+     |      ragas.metrics.validators.NumericValidator
+     |      ragas.metrics.validators.BaseValidator
+     |      abc.ABC
+     |      builtins.object
+     |
+     |  Methods defined here:
+     |
+     |  __init__(
+     |      self,
+     |      llm: 'InstructorBaseRagasLLM',
+     |      name: str = 'context_recall',
+     |      **kwargs
+     |  )
+     |      Initialize ContextRecall metric with required components.
+     |
+     |      Args:
+     |          llm: Modern instructor-based LLM for statement classification
+     |          name: The metric name (default: "context_recall")
+     |          **kwargs: Additional arguments passed to BaseMetric
+     |
+     |  async ascore(self, user_input: str, retrieved_contexts: List[str], reference: str) -> ragas.metrics.result.MetricResult
+     |      Calculate context recall score asynchronously.
+     |
+     |      Components are guaranteed to be validated and non-None by the base class.
+     |
+     |      Args:
+     |          user_input: The original question
+     |          retrieved_contexts: List of retrieved context strings
+     |          reference: The reference answer to evaluate
+     |
+     |      Returns:
+     |          MetricResult with recall score (0.0-1.0, higher is better)
+     |
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |
+     |  __abstractmethods__ = frozenset()
+     |
+     |  __annotations__ = {'llm': 'InstructorBaseRagasLLM'}
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ragas.metrics.collections.base.BaseMetric:
+     |
+     |  batch_score(self, inputs: List[Dict[str, Any]]) -> List[ragas.metrics.result.MetricResult]
+     |      Synchronous batch scoring that wraps abatch_score().
+     |
+     |      This is a convenience method for backward compatibility and sync usage.
+     |      For better performance, prefer using abatch_score() directly in async contexts.
+     |
+     |      Args:
+     |          inputs: List of input dictionaries for scoring
+     |
+     |      Returns:
+     |          List of MetricResult objects
+     |
+     |  score(self, **kwargs) -> ragas.metrics.result.MetricResult
+     |      Synchronous scoring method that wraps ascore().
+     |
+     |      This is a convenience method for backward compatibility and sync usage.
+     |      For better performance, prefer using ascore() directly in async contexts.
+     |
+     |      Returns:
+     |          MetricResult object
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ragas.metrics.base.SimpleBaseMetric:
+     |
+     |  __eq__(self, other)
+     |      Return self==value.
+     |
+     |  __replace__ = _replace(self, /, **changes) from dataclasses
+     |
+     |  __repr__(self)
+     |      Return repr(self).
+     |
+     |  async abatch_score(self, inputs: 't.List[t.Dict[str, t.Any]]') -> "t.List['MetricResult']"
+     |      Asynchronously calculate scores for a batch of inputs in parallel.
+     |
+     |      Parameters
+     |      ----------
+     |      inputs : List[Dict[str, Any]]
+     |          List of input dictionaries, each containing parameters for the metric.
+     |
+     |      Returns
+     |      -------
+     |      List[MetricResult]
+     |          List of evaluation results, one for each input.
+     |
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from ragas.metrics.base.SimpleBaseMetric:
+     |
+     |  __dict__
+     |      dictionary for instance variables
+     |
+     |  __weakref__
+     |      list of weak references to the object
+     |
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes inherited from ragas.metrics.base.SimpleBaseMetric:
+     |
+     |  __dataclass_fields__ = {'allowed_values': Field(name='allowed_values',...
+     |
+     |  __dataclass_params__ = _DataclassParams(init=True,repr=True,eq=True,or...
+     |
+     |  __hash__ = None
+     |
+     |  __match_args__ = ('name', 'allowed_values')
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from ragas.metrics.validators.NumericValidator:
+     |
+     |  validate_result_value(self, result_value: Any) -> Optional[str]
+     |      Validate that result value is within the numeric range.
+
+DATA
+    __all__ = ['ContextRecall']
+
+FILE
+    c:\users\thu\appdata\local\packages\pythonsoftwarefoundation.python.3.13_qbz5n2kfra8p0\localcache\local-packages\python313\site-packages\ragas\metrics\collections\context_recall\__init__.py
+
+
