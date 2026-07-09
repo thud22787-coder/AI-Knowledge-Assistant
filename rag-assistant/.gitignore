@@ -1,0 +1,5 @@
+eval/results.json
+eval/ragas_scores.json
+eval/*.txt
+eval/raw_run_output*.json
+eval/raw_chat_run.py
