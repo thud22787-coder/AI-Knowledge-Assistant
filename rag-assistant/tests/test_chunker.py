@@ -48,6 +48,15 @@ def test_chunk_has_overlap():
     assert chunks[1]["text"].startswith(chunks[0]["text"][-15:])
 
 
+def test_chunk_overlap_adds_space_separator_not_glued_text():
+    text = "DOCX paragraph one: alpha beta gamma.\n\nDOCX paragraph two: delta epsilon zeta."
+
+    chunks = chunk_text(text, max_chunk_size=500, overlap=50)
+
+    assert len(chunks) == 2
+    assert "gamma.DOCX" not in chunks[1]["text"]
+
+
 def test_chunk_oversized_single_sentence_gets_truncated():
     text = "a" * 300
 

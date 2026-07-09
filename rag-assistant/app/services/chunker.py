@@ -65,7 +65,7 @@ def chunk_text(text: str, max_chunk_size: int = 500, overlap: int = 50) -> list[
     for index, chunk_text_value in enumerate(paragraph_chunks):
         if overlap > 0 and previous_text:
             prefix = previous_text[-overlap:]
-            combined_text = f"{prefix}{chunk_text_value}"
+            combined_text = f"{prefix} {chunk_text_value}"
         else:
             combined_text = chunk_text_value
 
